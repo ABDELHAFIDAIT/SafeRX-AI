@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------
+  # 1. BASE DE DONNÉES (POSTGRESQL)
+  # Stocke le Master Data (KB) et les Logs d'Audit
+  # ----------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: saferx-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./data/postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - saferx-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------
+  # 2. ETL ENGINE (APACHE SPARK)
+  # Exécute les scripts PySpark pour transformer RxNorm/OpenFDA
+  # ----------------------------------------------------------------
+  spark-etl:
+    image: bitnami/spark:3.5
+    container_name: saferx-etl
+    user: root
+    environment:
+      - SPARK_MODE=master
+      - DB_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./data:/data
+      - ./services/etl/src:/app/src
+      - ./services/etl/requirements.txt:/app/requirements.txt
+    command: tail -f /dev/null
+    networks:
+      - saferx-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------
+  # 3. GUI DATABASE (PgAdmin)
+  # Interface graphique pour gérer PostgreSQL via le navigateur
+  # ----------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: saferx-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    networks:
+      - saferx-net
+    depends_on:
+      - db
+
+  # ----------------------------------------------------------------
+  # SERVICES FUTURS (SPRINTS 2, 3, 4)
+  # Décommentez-les au fur et à mesure du développement
+  # ----------------------------------------------------------------
+
+  # backend:
+  #   build: ./services/backend
+  #   container_name: saferx-backend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - DATABASE_HOST=db
+  #   depends_on:
+  #     - db
+  #   networks:
+  #     - saferx-net
+
+  # ai-engine:
+  #   build: ./services/ai-engine
+  #   container_name: saferx-ai
+  #   ports:
+  #     - "8000:8000"
+  #   networks:
+  #     - saferx-net
+
+  # frontend:
+  #   build: ./services/frontend
+  #   container_name: saferx-frontend
+  #   ports:
+  #     - "3001:3000"
+  #   networks:
+  #     - saferx-net
+
+networks:
+  saferx-net:
+    driver: bridge

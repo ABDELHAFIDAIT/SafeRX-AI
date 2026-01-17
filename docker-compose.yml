@@ -31,11 +31,12 @@ services:
   # Exécute les scripts PySpark pour transformer RxNorm/OpenFDA
   # ----------------------------------------------------------------
   spark-etl:
-    image: bitnami/spark:3.5
+    image: apache/spark:3.5.0
     container_name: saferx-etl
-    user: root
+    user: root # Indispensable pour pip install
     environment:
-      - SPARK_MODE=master
+      - SPARK_NO_DAEMONIZE=true
+      # Infos DB
       - DB_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
@@ -43,6 +44,7 @@ services:
       - ./data:/data
       - ./services/etl/src:/app/src
       - ./services/etl/requirements.txt:/app/requirements.txt
+    # Cette commande garde le conteneur actif indéfiniment
     command: tail -f /dev/null
     networks:
       - saferx-net

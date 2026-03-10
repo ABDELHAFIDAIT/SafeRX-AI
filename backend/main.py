@@ -7,6 +7,8 @@ from backend.app.db.session import engine
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.app.db.init_db import init_db
+from backend.app.models import user
+from backend.app.models import drug
 
 
 Base.metadata.create_all(bind=engine)

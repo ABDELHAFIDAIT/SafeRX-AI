@@ -1,21 +1,19 @@
-FROM eclipse-temurin:17-jre-jammy
+FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y \
-    python3.11 python3.11-dev python3-pip \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-21-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
 WORKDIR /app
 
 COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY *.py .
 
-COPY transform_med_ma.py .
 
-CMD ["spark-submit", \
-     "--master", "local[*]", \
-     "--driver-memory", "2g", \
-     "transform_med_ma.py"]
+CMD ["python3", "transform_med_ma.py"]

@@ -10,14 +10,25 @@ services:
     volumes:
       - ./data/raw:/app/data/raw
     command: python scraper_med_ma.py --output data/raw/all_drugs_med_ma.csv
-  
+
   etl:
     build: { context: ./etl }
     profiles: [etl]
     volumes:
       - ./data/raw:/app/data/raw
       - ./data/processed:/app/data/processed
-  
+
+  etl-load:
+    build: { context: ./etl }
+    profiles: [etl]
+    command: ["python3", "load_med_ma.py"]
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./data/processed:/app/data/processed
+
   db:
     image: postgres:15
     container_name: saferxai_db
@@ -30,6 +41,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   adminer:
     image: adminer
@@ -39,23 +55,24 @@ services:
       - "8080:8080"
     depends_on:
       - db
-  
+
   api:
     build: .
     container_name: saferxai_backend
     restart: always
-    depends_on: 
-      - db
+    depends_on:
+      db:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - GIT_PYTHON_REFRESH=quiet
     volumes:
-      - .:/app 
+      - .:/app
     ports:
       - "8000:8000"
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-  
+
   frontend:
     build:
       context: ./frontend

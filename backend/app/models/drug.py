@@ -36,7 +36,7 @@ class DciComponent(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     drug_id = Column(Integer, ForeignKey("drugs_ma.id", ondelete="CASCADE"), nullable=False, index=True)
-    dci = Column(String(255), nullable=False, index=True)
+    dci = Column(Text, nullable=False, index=True)
     position = Column(Integer, nullable=False)
 
     drug     = relationship("Drug", back_populates="dci_components")

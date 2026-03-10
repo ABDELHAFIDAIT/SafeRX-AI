@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  scraper:
+    build:
+      context: ./scraping
+    container_name: saferxai_scraper
+    profiles:
+      - scraping
+    volumes:
+      - ./data/raw:/app/data/raw
+    command: python scraper_med_ma.py --output data/raw/all_drugs_med_ma.csv
+  
   db:
     image: postgres:15
     container_name: saferxai_db

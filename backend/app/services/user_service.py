@@ -27,6 +27,26 @@ def create_user(db: Session, user_in: UserCreate) :
     return user
 
 
+def create_user_with_password(db: Session, user_in: UserCreate, password: str) -> User:
+    hashed_password = get_password_hash(password)
+    
+    db_user = User(
+        first_name=user_in.first_name,
+        last_name=user_in.last_name,
+        email=user_in.email,
+        password=hashed_password,
+        role=user_in.role,
+        is_first_login=True,
+        is_active=True
+    )
+    
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    return db_user
+
+
 def update_password(db: Session, user: User, new_password: str) -> User:
     user.password = get_password_hash(new_password)
     user.is_first_login = False

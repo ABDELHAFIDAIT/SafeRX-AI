@@ -35,5 +35,7 @@ def login(
         "access_token": access_token, 
         "token_type": "bearer", 
         "is_first_login": user.is_first_login, 
-        "role": user.role.value
+        "role": user.role.value,
+        "first_name": user.first_name,
+        "last_name": user.last_name
     }

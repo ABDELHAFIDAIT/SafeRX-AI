@@ -1,69 +1,84 @@
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
+from __future__ import annotations
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.app.api.deps import get_db, get_current_active_admin, get_current_user
-from backend.app.schemas.user import UserCreate, UserOut
-from backend.app.services import user_service
+from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.user import User, Role
-from backend.app.services.email_service import generate_password, send_credentials_email
+from backend.app.schemas.user import UserCreate, UserOut
+from backend.app.services.user_service import create_user_with_password, update_password
+from backend.app.services.email_service import send_credentials_email
+import secrets
+import string
 
 
 router = APIRouter()
 
-ALLOWED_ROLES = {Role.DOCTOR, Role.PHARMACIST}
 
-@router.post("/create", response_model=UserOut)
-def create_account(user_in: UserCreate, db: Session = Depends(get_db), current_admin: User =  Depends(get_current_active_admin)) :
-    if user_in.role not in ALLOWED_ROLES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Un admin ne peut créer que des comptes : "
-                   f"{', '.join(r.value for r in ALLOWED_ROLES)}.",
-        )
-    
-    db_user = user_service.get_user_by_email(db, email=user_in.email)
-    
-    if db_user:
-        raise HTTPException(
-            status_code=400, detail="Un utilisateur avec cet email existe déjà."
-        )
-    
-    plain_password = generate_password()
-    
-    user_data = user_in.model_copy(update={"password": plain_password})
-    new_user = user_service.create_user(db, user_in=user_data)
+def _generate_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
+
+
+
+@router.post( "/create", response_model=UserOut, status_code=status.HTTP_201_CREATED, summary="Créer un compte utilisateur (admin seulement)" )
+def create_account( payload: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user) ):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Réservé aux administrateurs.",
+        )
+
+    # Vérifier unicité de l'email
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"L'adresse {payload.email} est déjà utilisée.",
+        )
+
+    password = _generate_password()
+    user = create_user_with_password(
+        db=db,
+        user_in=payload,
+        password=password,
+    )
+
+    # Envoyer les identifiants par email
     try:
         send_credentials_email(
-            to_email=new_user.email,
-            first_name=new_user.first_name,
-            role=new_user.role.value,
-            plain_password=plain_password,
+            to_email=user.email,
+            first_name=user.first_name,
+            role=payload.role,
+            plain_password=password
         )
-    except Exception as e:
+    except Exception:
+        pass  # Ne pas bloquer la création si l'email échoue
+
+    return user
+
+
+
+
+@router.post( "/change-password", summary="Changer son mot de passe (première connexion ou renouvellement)", )
+def change_password( payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), ):
+    new_password = payload.get("new_password", "")
+    if len(new_password) < 8:
         raise HTTPException(
-            status_code=201,
-            detail=f"Compte créé mais l'envoi de l'email a échoué : {str(e)}",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Le mot de passe doit contenir au moins 8 caractères.",
         )
-
-    return new_user
-
-
-
-
-class PasswordChange(BaseModel):
-    new_password: str
-
-
-
-@router.post("/change-password")
-def change_password(
-    body: PasswordChange,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if not current_user.is_first_login:
-        raise HTTPException(status_code=400, detail="Mot de passe déjà changé.")
-
-    user_service.update_password(db, user=current_user, new_password=body.new_password)
+    update_password(db=db, user=current_user, new_password=new_password)
     return {"message": "Mot de passe mis à jour avec succès."}
+
+
+
+
+@router.get( "/users", response_model=list[UserOut], summary="Lister tous les utilisateurs (admin seulement)", )
+def list_users( db: Session = Depends(get_db), current_user: User = Depends(get_current_user), ):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Réservé aux administrateurs.",
+        )
+    return db.query(User).order_by(User.created_at.desc()).all()
+

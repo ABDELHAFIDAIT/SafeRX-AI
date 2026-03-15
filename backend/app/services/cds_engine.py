@@ -1,10 +1,25 @@
+"""
+SafeRx AI — Moteur de règles CDS (Clinical Decision Support)
+─────────────────────────────────────────────────────────────
+Règles implémentées :
+
+  1. ALLERGY           — DCI prescrite ∈ allergies connues du patient
+  2. REDUNDANT_DCI     — deux lignes partagent la même molécule active
+  3. POSOLOGY          — âge du patient < âge minimal du médicament
+  4. CONTRA_INDICATION — grossesse / allaitement dans les contraindications
+  5. PSYCHOACTIVE      — substance psychoactive (MINOR, informatif)
+  6. INTERACTION       — paire DCI×DCI trouvée dans drug_interactions (Thésaurus ANSM)
+"""
 from __future__ import annotations
+
 import re
 import unicodedata
 from datetime import date
 from typing import List
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from backend.app.models.cds_alert import CdsAlert
 from backend.app.models.drug import Drug, DciComponent
 from backend.app.models.drug_interaction import DrugInteraction
@@ -23,11 +38,9 @@ def _age_years(birthdate: date) -> int:
     )
 
 
-
 def _normalize_dci(dci: str) -> str:
     """Lowercase + strip — comparaison interne."""
     return dci.strip().lower()
-
 
 
 def _normalize_for_ansm(dci: str) -> str:
@@ -48,7 +61,6 @@ def _normalize_for_ansm(dci: str) -> str:
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
 
 
-
 def _parse_min_age_years(raw: str | None) -> int | None:
     if not raw:
         return None
@@ -67,14 +79,12 @@ def _parse_min_age_years(raw: str | None) -> int | None:
     return None
 
 
-
 def _mentions_pregnancy(text: str | None) -> bool:
     if not text:
         return False
     kw = ("grossesse", "enceinte", "pregnant", "pregnancy",
           "tératogène", "teratogen", "foetus", "fœtus")
     return any(k in text.lower() for k in kw)
-
 
 
 def _mentions_breastfeeding(text: str | None) -> bool:
@@ -84,13 +94,16 @@ def _mentions_breastfeeding(text: str | None) -> bool:
     return any(k in text.lower() for k in kw)
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Règle 6 — INTERACTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-
-def _check_interactions( db: Session, lines: List[PrescriptionLine], primary_dcis: dict[int, List[str]], drugs_by_id: dict[int, Drug] ) -> List[CdsAlert]:
+def _check_interactions(
+    db: Session,
+    lines: List[PrescriptionLine],
+    primary_dcis: dict[int, List[str]],
+    drugs_by_id: dict[int, Drug],
+) -> List[CdsAlert]:
     """
     Détecte les interactions DCI×DCI en une seule requête SQL.
 
@@ -186,13 +199,15 @@ def _check_interactions( db: Session, lines: List[PrescriptionLine], primary_dci
     return alerts
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Moteur principal
 # ─────────────────────────────────────────────────────────────────────────────
 
-
-def analyse_prescription( db: Session, patient: Patient, lines: List[PrescriptionLine] ) -> List[CdsAlert]:
+def analyse_prescription(
+    db: Session,
+    patient: Patient,
+    lines: List[PrescriptionLine],
+) -> List[CdsAlert]:
     """
     Analyse toutes les lignes d'une prescription.
     Retourne la liste des CdsAlert à persister (sans commit).
@@ -208,6 +223,7 @@ def analyse_prescription( db: Session, patient: Patient, lines: List[Prescriptio
         for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
     }
 
+    # primary_dcis : TOUTES les DCI (pour ALLERGY — couvre tous les composants)
     primary_dcis: dict[int, List[str]] = {}
     for comp in (
         db.query(DciComponent).filter(DciComponent.drug_id.in_(drug_ids)).all()
@@ -216,20 +232,82 @@ def analyse_prescription( db: Session, patient: Patient, lines: List[Prescriptio
             _normalize_dci(comp.dci)
         )
 
+    # main_dci : DCI PRIMAIRE uniquement (position=1) — pour REDUNDANT_DCI
+    # Évite de signaler comme "redondance" les excipients ou DCI secondaires
+    # Ex: ALGIK contient paracétamol (pos1) + caféine (pos2)
+    #     → on ne détecte la redondance que sur paracétamol, pas caféine
+    main_dcis: dict[int, str] = {}
+    for comp in (
+        db.query(DciComponent)
+        .filter(
+            DciComponent.drug_id.in_(drug_ids),
+            DciComponent.position == 1,
+        )
+        .all()
+    ):
+        main_dcis[comp.drug_id] = _normalize_dci(comp.dci)
+
+    # ── Table de correspondance allergie → familles/mots-clés associés ──────
+    # Quand un patient est allergique à "Pénicilline", tout médicament dont
+    # la DCI contient "cilline", "cillin", "pénam", "amoxicilline", etc. doit alerter.
+    ALLERGY_FAMILY_MAP: dict[str, List[str]] = {
+        # Famille Bêta-lactamines / Pénicillines
+        "pénicilline":    ["cilline", "cillin", "amoxicilline", "ampicilline",
+                           "oxacilline", "cloxacilline", "flucloxacilline",
+                           "pivmécillinam", "pénicilline", "bêta-lactamine"],
+        "penicilline":    ["cilline", "cillin", "amoxicilline", "ampicilline",
+                           "oxacilline", "cloxacilline", "flucloxacilline",
+                           "pénicilline", "beta-lactamine"],
+        # Famille Sulfamides
+        "sulfamide":      ["sulfaméthoxazole", "sulfamethoxazole", "sulfamide",
+                           "cotrimoxazole", "triméthoprime", "trimethoprime",
+                           "sulfadiazine", "sulfadoxine"],
+        "sulfamides":     ["sulfaméthoxazole", "sulfamethoxazole", "sulfamide",
+                           "cotrimoxazole", "sulfadiazine"],
+        # Famille Céphalosporines (allergie croisée pénicilline ~10%)
+        "céphalosporine": ["céfazoline", "céfalexine", "cefazoline", "cefalexine",
+                           "céfixime", "cefixime", "ceftriaxone"],
+        # AINS
+        "aspirine":       ["acide acétylsalicylique", "aspirine", "ibuprofène",
+                           "naproxène", "diclofénac"],
+        # Iode / produits de contraste
+        "iode":           ["iode", "iodé", "povidone iodée", "lévothyroxine"],
+        # Latex
+        "latex":          ["latex"],
+        # Arachide / soja (excipients)
+        "arachide":       ["arachide", "huile d'arachide", "soja"],
+        "arachides":      ["arachide", "huile d'arachide", "soja"],
+    }
+
     patient_allergies: set[str] = set()
     if patient.known_allergies:
-        patient_allergies = {_normalize_dci(a) for a in patient.known_allergies}
+        for a in patient.known_allergies:
+            norm = _normalize_dci(a)
+            patient_allergies.add(norm)
+            if norm.endswith("s"):
+                patient_allergies.add(norm[:-1])
+            else:
+                patient_allergies.add(norm + "s")
 
+    # Index DCI primaire → lignes (pour REDUNDANT_DCI uniquement)
     dci_to_lines: dict[str, List[PrescriptionLine]] = {}
     for line in lines:
-        for dci in primary_dcis.get(line.drug_id, [_normalize_dci(line.dci)]):
-            dci_to_lines.setdefault(dci, []).append(line)
+        dci_principale = main_dcis.get(line.drug_id) or _normalize_dci(line.dci)
+        dci_to_lines.setdefault(dci_principale, []).append(line)
 
     # ── Règle 1 : ALLERGY ────────────────────────────────────────────────
+    # Vérification sur 3 niveaux :
+    #   1. DCI exacte           → "allergie à l'amoxicilline" → amoxicilline prescrit
+    #   2. Texte libre          → excipients dans contraindications / dci brut
+    #   3. Famille pharmacologique → "allergie pénicilline" → amoxicilline = pénicilline
     for line in lines:
+        drug      = drugs_by_id.get(line.drug_id)
         line_dcis = primary_dcis.get(line.drug_id, [_normalize_dci(line.dci)])
-        hit = patient_allergies & set(line_dcis)
-        if hit:
+        already_alerted = False
+
+        # Niveau 1 : match DCI exacte
+        hit_dci = patient_allergies & set(line_dcis)
+        if hit_dci:
             alerts.append(CdsAlert(
                 prescription_line_id=line.id,
                 alert_type="ALLERGY",
@@ -237,26 +315,98 @@ def analyse_prescription( db: Session, patient: Patient, lines: List[Prescriptio
                 title=f"Allergie connue — {line.dci}",
                 detail=(
                     f"Le patient a une allergie documentée à : "
-                    f"{', '.join(hit)}. "
-                    f"Médicament prescrit : {drugs_by_id[line.drug_id].brand_name}."
+                    f"{', '.join(hit_dci)}. "
+                    f"Médicament prescrit : {drug.brand_name if drug else line.dci}."
                 ),
             ))
+            already_alerted = True
+
+        # Niveau 2 : chercher l'allergène dans le texte libre
+        if not already_alerted and drug:
+            searchable_text = " ".join(filter(None, [
+                drug.contraindications or "",
+                drug.dci              or "",
+                drug.indications      or "",
+                drug.brand_name       or "",
+            ])).lower()
+
+            for allergen in patient_allergies:
+                pattern = r'\b' + re.escape(allergen) + r'\b'
+                if re.search(pattern, searchable_text):
+                    alerts.append(CdsAlert(
+                        prescription_line_id=line.id,
+                        alert_type="ALLERGY",
+                        severity="MAJOR",
+                        title=f"Allergie potentielle — {drug.brand_name}",
+                        detail=(
+                            f"Le médicament {drug.brand_name} peut contenir ou être associé à "
+                            f"'{allergen}' (excipient ou contre-indication). "
+                            f"Allergie documentée : {allergen}. "
+                            f"Vérifier la composition complète avant de dispenser."
+                        ),
+                    ))
+                    already_alerted = True
+                    break
+
+        # Niveau 3 : détection par famille pharmacologique
+        # Ex: "Pénicilline" dans les allergies → "amoxicilline" dans la DCI → ALERTE
+        if not already_alerted and drug:
+            drug_dci_full = " ".join(line_dcis).lower()
+            for allergen in patient_allergies:
+                related_keywords = ALLERGY_FAMILY_MAP.get(allergen, [])
+                for keyword in related_keywords:
+                    if keyword in drug_dci_full:
+                        allergen_display = allergen.capitalize()
+                        # Récupérer l'allergie originale (avant singulier/pluriel)
+                        allergen_original = next(
+                            (a for a in (patient.known_allergies or [])
+                             if _normalize_dci(a) == allergen
+                             or _normalize_dci(a).rstrip("s") == allergen
+                             or _normalize_dci(a) + "s" == allergen),
+                            allergen_display
+                        )
+                        # DCI affichée = celle qui a matché le keyword (plus précis)
+                        matched_dci = next(
+                            (d for d in line_dcis if keyword in d.lower()),
+                            line.dci
+                        )
+                        alerts.append(CdsAlert(
+                            prescription_line_id=line.id,
+                            alert_type="ALLERGY",
+                            severity="MAJOR",
+                            title=f"Allergie croisée — {drug.brand_name if drug else line.dci}",
+                            detail=(
+                                f"Le patient est allergique aux {allergen_original}. "
+                                f"Le médicament prescrit ({drug.brand_name if drug else line.dci}) "
+                                f"appartient à cette famille ou présente un risque de réaction croisée "
+                                f"(DCI : {matched_dci.capitalize()}). Vérifier avant administration."
+                            ),
+                        ))
+                        already_alerted = True
+                        break
+                if already_alerted:
+                    break
 
     # ── Règle 2 : REDUNDANT_DCI ──────────────────────────────────────────
     seen_redondances: set[str] = set()
     for dci_norm, dup_lines in dci_to_lines.items():
         if len(dup_lines) > 1 and dci_norm not in seen_redondances:
             seen_redondances.add(dci_norm)
-            drug_names = [drugs_by_id[l.drug_id].brand_name for l in dup_lines]
+            # Déduplication des noms de médicaments (évite "ALGIK, ALGIK")
+            drug_names = list(dict.fromkeys(
+                drugs_by_id[l.drug_id].brand_name for l in dup_lines
+            ))
+            dci_display = dci_norm.capitalize()
             for line in dup_lines[1:]:
                 alerts.append(CdsAlert(
                     prescription_line_id=line.id,
                     alert_type="REDUNDANT_DCI",
                     severity="MODERATE",
-                    title=f"Redondance de DCI — {line.dci}",
+                    title=f"Redondance de DCI — {dci_display}",
                     detail=(
-                        f"La molécule '{dci_norm}' est présente dans plusieurs "
-                        f"médicaments : {', '.join(drug_names)}."
+                        f"La molécule '{dci_display}' est présente dans plusieurs "
+                        f"médicaments de la prescription : {', '.join(drug_names)}. "
+                        f"Risque de surdosage cumulatif."
                     ),
                 ))
 
@@ -330,5 +480,74 @@ def analyse_prescription( db: Session, patient: Patient, lines: List[Prescriptio
         _check_interactions(db, lines, primary_dcis, drugs_by_id)
     )
 
-    return alerts
+    # ── Règle 7 : RENAL — médicaments CI ou à ajuster en IRC ─────────────
+    # Détecte les médicaments néphrotoxiques ou contre-indiqués selon la
+    # clairance rénale du patient (creatinine_clearance en mL/min)
+    if patient.creatinine_clearance is not None:
+        crcl = float(patient.creatinine_clearance)
 
+        # Table des médicaments à risque rénal avec seuils de clairance
+        # Format: {keyword_dci: (seuil_mL/min, sévérité, message_risque)}
+        RENAL_RISK_DRUGS: dict[str, tuple] = {
+            # Metformine : CI si CrCl < 30, précaution si < 45
+            "metformine":       (45,  "MAJOR",    "contre-indication (risque d'acidose lactique)"),
+            "metformin":        (45,  "MAJOR",    "contre-indication (risque d'acidose lactique)"),
+            # AINS : néphrotoxiques, CI si IRC sévère
+            "ibuprofène":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            "ibuprofene":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            "naproxène":        (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            "diclofénac":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            "kétorolac":        (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            # Antibiotiques néphrotoxiques
+            "gentamicine":      (60,  "MAJOR",    "accumulation et néphrotoxicité"),
+            "vancomycine":      (50,  "MAJOR",    "accumulation et néphrotoxicité"),
+            "amikacine":        (60,  "MAJOR",    "accumulation et néphrotoxicité"),
+            # Anticoagulants à élimination rénale
+            "dabigatran":       (30,  "MAJOR",    "accumulation — risque hémorragique"),
+            "rivaroxaban":      (15,  "MAJOR",    "accumulation — risque hémorragique"),
+            "apixaban":         (25,  "MODERATE", "précaution, adapter la dose"),
+            # Hypoglycémiants
+            "glyburide":        (60,  "MAJOR",    "risque d'hypoglycémie prolongée"),
+            "glibenclamide":    (60,  "MAJOR",    "risque d'hypoglycémie prolongée"),
+            "sitagliptine":     (45,  "MODERATE", "adapter la posologie à la fonction rénale"),
+            # Diurétiques
+            "spironolactone":   (30,  "MAJOR",    "risque d'hyperkaliémie en IRC"),
+            "triamtérène":      (30,  "MAJOR",    "risque d'hyperkaliémie en IRC"),
+            # Lithium
+            "lithium":          (50,  "MAJOR",    "accumulation — fenêtre thérapeutique étroite"),
+            # Colchicine
+            "colchicine":       (30,  "MAJOR",    "accumulation — risque de myopathie/neuropathie"),
+            # Aciclovir
+            "aciclovir":        (25,  "MODERATE", "adapter la posologie"),
+            "valaciclovir":     (30,  "MODERATE", "adapter la posologie"),
+        }
+
+        for line in lines:
+            drug = drugs_by_id.get(line.drug_id)
+            line_dcis_list = primary_dcis.get(line.drug_id, [_normalize_dci(line.dci)])
+
+            for dci in line_dcis_list:
+                for keyword, (threshold, severity, risk_msg) in RENAL_RISK_DRUGS.items():
+                    if keyword in dci and crcl < threshold:
+                        irc_label = (
+                            "sévère (stade 4-5)" if crcl < 30 else
+                            "modérée (stade 3)"  if crcl < 45 else
+                            "légère (stade 2)"   if crcl < 60 else
+                            "débutante"
+                        )
+                        alerts.append(CdsAlert(
+                            prescription_line_id=line.id,
+                            alert_type="RENAL",
+                            severity=severity,
+                            title=f"Insuffisance rénale — {drug.brand_name if drug else line.dci}",
+                            detail=(
+                                f"Ce médicament est {risk_msg} "
+                                f"lorsque la clairance rénale est < {threshold} mL/min. "
+                                f"Clairance du patient : {crcl:.1f} mL/min "
+                                f"(IRC {irc_label}). "
+                                f"Adapter la posologie ou substituer."
+                            ),
+                        ))
+                        break   # une seule alerte par ligne
+
+    return alerts

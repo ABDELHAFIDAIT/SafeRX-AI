@@ -7,20 +7,13 @@ from pathlib import Path
 from typing import Optional
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Configuration
-# ─────────────────────────────────────────────────────────────────────────────
-
+# Chemin du fichier .pkl du modèle et seuil minimal d'échantillons pour l'entraînement
 MODEL_PATH   = Path(os.getenv("LR_MODEL_PATH", "/app/data/models/lr_alert_fatigue.pkl"))
-MIN_SAMPLES  = int(os.getenv("LR_MIN_SAMPLES", "20"))   # minimum pour entraîner
+MIN_SAMPLES  = int(os.getenv("LR_MIN_SAMPLES", "20"))
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Encodage des features catégorielles
-# ─────────────────────────────────────────────────────────────────────────────
-
+# Encodages catégoriels pour les features du modèle (entiers ordonnés)
 ALERT_TYPE_MAP = {
     "INTERACTION":        0,
     "ALLERGY":            1,
@@ -31,7 +24,7 @@ ALERT_TYPE_MAP = {
 }
 
 SEVERITY_MAP = {
-    "MAJOR":    2,
+    "MAJOR":    2,  # valeur la plus haute → plus susceptible d'être ignoré selon l'historique
     "MODERATE": 1,
     "MINOR":    0,
     "UNKNOWN":  0,
@@ -43,22 +36,16 @@ def _encode_row(
     alert_severity: str,
     created_at:     datetime,
 ) -> list[float]:
-    """
-    Encode une observation en vecteur de features numériques.
-    Features : [alert_type_enc, severity_enc, hour_of_day, day_of_week]
-    """
+    # Encode une alerte en vecteur de 4 features numériques pour la LR
     type_enc     = ALERT_TYPE_MAP.get(alert_type,     ALERT_TYPE_MAP["UNKNOWN"])
     severity_enc = SEVERITY_MAP.get(alert_severity,   SEVERITY_MAP["UNKNOWN"])
-    hour         = created_at.hour        if created_at else 12
-    dow          = created_at.weekday()   if created_at else 0
+    hour         = created_at.hour        if created_at else 12   # heure de la décision
+    dow          = created_at.weekday()   if created_at else 0    # jour de la semaine (0=lundi)
     return [float(type_enc), float(severity_enc), float(hour), float(dow)]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Modèle global (chargé en mémoire une fois)
-# ─────────────────────────────────────────────────────────────────────────────
-
-_model      = None   # sklearn LogisticRegression
+# Modèle sklearn en mémoire + métadonnées de l'entraînement
+_model      = None
 _model_meta = {
     "trained":       False,
     "n_samples":     0,
@@ -68,7 +55,7 @@ _model_meta = {
 
 
 def _load_model() -> bool:
-    """Charge le modèle depuis le disque si disponible. Retourne True si succès."""
+    # Charge le modèle .pkl depuis le disque si disponible, retourne True si succès
     global _model, _model_meta
     if MODEL_PATH.exists():
         try:
@@ -87,24 +74,15 @@ def _load_model() -> bool:
 
 
 def _save_model() -> None:
-    """Persiste le modèle + métadonnées sur le disque."""
+    # Persiste le modèle + ses métadonnées dans un fichier pickle
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(MODEL_PATH, "wb") as f:
         pickle.dump({"model": _model, "meta": _model_meta}, f)
     logger.info(f"[LR] Modèle sauvegardé → {MODEL_PATH}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Entraînement
-# ─────────────────────────────────────────────────────────────────────────────
-
 def train(db) -> dict:
-    """
-    Entraîne la Logistic Regression sur l'historique audit_cds_hooks.
-
-    Retourne :
-        dict avec n_samples, accuracy, status
-    """
+    # Entraîne la Logistic Regression sur l'historique audit_cds_hooks
     global _model, _model_meta
 
     from app.models.audit_cds_hook import AuditCdsHook
@@ -118,7 +96,6 @@ def train(db) -> dict:
     except ImportError:
         return {"status": "error", "detail": "scikit-learn non installé (pip install scikit-learn)"}
 
-    # ── Charger les données ───────────────────────────────────────────────
     rows = db.query(AuditCdsHook).all()
 
     if len(rows) < MIN_SAMPLES:
@@ -128,11 +105,10 @@ def train(db) -> dict:
             "n_samples": len(rows),
         }
 
-    # ── Construire X et y ─────────────────────────────────────────────────
+    # Construit X (features) et y (label : 1 = ignoré, 0 = accepté)
     X, y = [], []
     for row in rows:
-        # Label : 1 = ignoré (IGNORED ou OVERRIDE), 0 = accepté
-        label = 1 if row.decision in ("IGNORED", "OVERRIDE") else 0
+        label = 1 if row.decision in ("IGNORED", "OVERRIDE") else 0  # binaire : ignoré vs accepté
         features = _encode_row(
             alert_type     = row.alert_type     or "UNKNOWN",
             alert_severity = row.alert_severity or "UNKNOWN",
@@ -144,7 +120,7 @@ def train(db) -> dict:
     X = np.array(X)
     y = np.array(y)
 
-    # ── Vérifier qu'il y a les deux classes ──────────────────────────────
+    # Vérifie qu'il y a au moins 2 classes pour que la LR puisse s'entraîner
     unique_classes = np.unique(y)
     if len(unique_classes) < 2:
         return {
@@ -153,8 +129,7 @@ def train(db) -> dict:
             "n_samples": len(rows),
         }
 
-    # ── Split train/test ──────────────────────────────────────────────────
-    # Si moins de 40 samples → pas de split, on entraîne sur tout
+    # Split train/test uniquement si assez de données, sinon entraîne sur le tout
     if len(rows) >= 40:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
@@ -162,13 +137,13 @@ def train(db) -> dict:
     else:
         X_train, X_test, y_train, y_test = X, X, y, y
 
-    # ── Pipeline : StandardScaler + LogisticRegression ───────────────────
+    # Pipeline : normalise les features puis applique la LR avec poids équilibrés
     pipeline = Pipeline([
         ("scaler", StandardScaler()),
         ("lr",     LogisticRegression(
             C             = 1.0,
             max_iter      = 500,
-            class_weight  = "balanced",   # compense le déséquilibre ACCEPTED >> IGNORED
+            class_weight  = "balanced",  # compense le déséquilibre ACCEPTED >> IGNORED
             random_state  = 42,
             solver        = "lbfgs",
         )),
@@ -177,7 +152,6 @@ def train(db) -> dict:
     pipeline.fit(X_train, y_train)
     accuracy = accuracy_score(y_test, pipeline.predict(X_test))
 
-    # ── Mettre à jour le modèle global ───────────────────────────────────
     _model = pipeline
     _model_meta = {
         "trained":    True,
@@ -188,10 +162,7 @@ def train(db) -> dict:
 
     _save_model()
 
-    logger.info(
-        f"[LR] Modèle entraîné — {len(rows)} samples, "
-        f"accuracy={accuracy:.3f}"
-    )
+    logger.info(f"[LR] Modèle entraîné — {len(rows)} samples, accuracy={accuracy:.3f}")
 
     return {
         "status":    "ok",
@@ -201,27 +172,19 @@ def train(db) -> dict:
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Scoring
-# ─────────────────────────────────────────────────────────────────────────────
-
 def score_alert(
     alert_type:     str,
     alert_severity: str,
     created_at:     Optional[datetime] = None,
 ) -> Optional[float]:
-    """
-    Prédit la probabilité qu'un médecin ignore cette alerte.
-    Retourne un float entre 0 et 1, ou None si le modèle n'est pas prêt.
-    """
+    # Prédit la probabilité qu'un médecin ignore cette alerte (0.0 → 1.0)
     global _model
 
-    # Charger le modèle depuis le disque si pas encore en mémoire
     if _model is None:
-        _load_model()
+        _load_model()  # chargement lazy depuis le disque
 
     if _model is None:
-        return None
+        return None  # modèle pas encore entraîné
 
     try:
         features = _encode_row(
@@ -230,8 +193,7 @@ def score_alert(
             created_at     = created_at or datetime.utcnow(),
         )
         X = np.array([features])
-        # proba[:, 1] = probabilité de la classe "ignoré"
-        proba = _model.predict_proba(X)[0][1]
+        proba = _model.predict_proba(X)[0][1]  # probabilité de la classe "ignoré" (index 1)
         return round(float(proba), 3)
     except Exception as e:
         logger.warning(f"[LR] Scoring échoué : {e}")
@@ -239,11 +201,7 @@ def score_alert(
 
 
 def score_alerts(alerts: list) -> None:
-    """
-    Enrichit in-place une liste d'alertes CdsAlert avec ai_ignore_proba.
-    Appelé par prescription_service après le RAG.
-    Ne lève jamais d'exception.
-    """
+    # Enrichit in-place une liste d'alertes avec ai_ignore_proba — appelé par prescription_service
     global _model
 
     if _model is None:
@@ -261,14 +219,11 @@ def score_alerts(alerts: list) -> None:
             created_at     = now,
         )
         if proba is not None:
-            alert.ai_ignore_proba = proba
+            alert.ai_ignore_proba = proba  # stocké directement sur l'objet ORM
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Statut du modèle (exposé dans GET /ai/status)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def get_lr_status() -> dict:
+    # Retourne l'état courant du modèle LR — utilisé par GET /ai/status
     global _model, _model_meta
     if _model is None:
         _load_model()

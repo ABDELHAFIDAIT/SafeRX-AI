@@ -13,11 +13,11 @@ from backend.app.services.cds_engine import analyse_prescription, _normalize_for
 from backend.app.services.ai_service import enrich_alerts_with_rag, RAG_ENABLED
 from backend.app.services.lr_service import score_alerts
 
-
 logger = logging.getLogger(__name__)
 
 
 def _age_years(birthdate: date) -> int | None:
+    # Calcule l'âge en années à partir de la date de naissance
     if not birthdate:
         return None
     today = date.today()
@@ -26,14 +26,13 @@ def _age_years(birthdate: date) -> int | None:
     )
 
 
-
-def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User ) -> Prescription:
-    # ── Vérifier que le patient existe ───────────────────────────────────────
+def create_prescription(db: Session, payload: PrescriptionCreate, doctor: User) -> Prescription:
+    # Vérifie l'existence du patient avant toute création
     patient: Patient | None = db.query(Patient).get(payload.patient_id)
     if not patient:
         raise ValueError(f"Patient {payload.patient_id} introuvable.")
 
-    # ── Vérifier que tous les drug_id existent ───────────────────────────────
+    # Valide que tous les médicaments référencés existent en base
     requested_drug_ids = {line.drug_id for line in payload.lines}
     found_ids = {
         d.id for d in db.query(Drug.id).filter(Drug.id.in_(requested_drug_ids))
@@ -42,7 +41,7 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     if missing:
         raise ValueError(f"Médicaments introuvables : {missing}")
 
-    # ── Créer l'en-tête ──────────────────────────────────────────────────────
+    # Crée l'en-tête de la prescription avec statut initial "draft"
     prescription = Prescription(
         patient_id    = payload.patient_id,
         doctor_id     = doctor.id,
@@ -51,9 +50,9 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
         status        = "draft",
     )
     db.add(prescription)
-    db.flush()
+    db.flush()  # génère prescription.id sans commit
 
-    # ── Créer les lignes ─────────────────────────────────────────────────────
+    # Crée chaque ligne de médicament et les ajoute à la session
     lines: list[PrescriptionLine] = []
     for line_data in payload.lines:
         line = PrescriptionLine(
@@ -69,18 +68,19 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
         db.add(line)
         lines.append(line)
 
-    db.flush()
+    db.flush()  # génère les IDs des lignes avant l'analyse CDS
 
-    # ── Moteur de règles CDS ─────────────────────────────────────────────────
+    # Lance le moteur de règles CDS sur toutes les lignes de la prescription
     alerts = analyse_prescription(db=db, patient=patient, lines=lines)
 
-    # ── Enrichissement RAG (best-effort, ne bloque pas si LLM indisponible) ──
+    # Enrichissement RAG : best-effort, n'interrompt pas la prescription si le LLM échoue
     if RAG_ENABLED and alerts:
         try:
             drug_ids     = [l.drug_id for l in lines]
             drugs_by_id  = {
                 d.id: d for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
             }
+            # Collecte toutes les DCI normalisées ANSM pour chercher les interactions RAG
             all_dcis = set()
             for line in lines:
                 comps = (
@@ -91,6 +91,7 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
                 for comp in comps:
                     all_dcis.add(_normalize_for_ansm(comp.dci))
 
+            # Charge les interactions pertinentes pour le contexte RAG (nécessite ≥2 DCI)
             interactions_raw = (
                 db.query(DrugInteraction)
                 .filter(
@@ -100,6 +101,7 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
                 .all()
             ) if len(all_dcis) >= 2 else []
 
+            # Convertit en dict indexé par paire (dci_a, dci_b) pour accès O(1) dans le RAG
             interactions_ctx = {
                 (_normalize_for_ansm(i.dci_a), _normalize_for_ansm(i.dci_b)): i
                 for i in interactions_raw
@@ -120,7 +122,7 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
         except Exception as e:
             logger.error(f"RAG enrichissement échoué (non bloquant) : {e}")
 
-    # ── Scoring Logistic Regression — ai_ignore_proba (best-effort) ──────
+    # Scoring LR : best-effort, n'interrompt pas la prescription si le modèle est absent
     try:
         score_alerts(alerts)
         scored = sum(1 for a in alerts if a.ai_ignore_proba is not None)
@@ -129,15 +131,16 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     except Exception as e:
         logger.error(f"[LR] Scoring échoué (non bloquant) : {e}")
 
-    # ── Persister les alertes (enrichies ou non) ─────────────────────────────
+    # Persiste toutes les alertes (avec ou sans enrichissement IA)
     for alert in alerts:
         db.add(alert)
 
+    # Statut final : "alerts" si des alertes ont été détectées, "safe" sinon
     prescription.status = "alerts" if alerts else "safe"
 
     db.commit()
 
-    # ── Recharger avec les relations pour la réponse ─────────────────────────
+    # Recharge la prescription avec ses relations pour construire la réponse JSON
     db.refresh(prescription)
     prescription = (
         db.query(Prescription)
@@ -151,8 +154,8 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     return prescription
 
 
-
 def get_prescription(db: Session, prescription_id: int) -> Prescription | None:
+    # Récupère une prescription avec ses lignes et alertes chargées en eager loading
     return (
         db.query(Prescription)
         .options(
@@ -163,8 +166,8 @@ def get_prescription(db: Session, prescription_id: int) -> Prescription | None:
     )
 
 
-
-def list_prescriptions_for_patient( db: Session, patient_id: int, skip: int  = 0, limit: int = 20 ) -> list[Prescription]:
+def list_prescriptions_for_patient(db: Session, patient_id: int, skip: int = 0, limit: int = 20) -> list[Prescription]:
+    # Retourne les prescriptions d'un patient triées par date décroissante, avec pagination
     return (
         db.query(Prescription)
         .filter(Prescription.patient_id == patient_id)

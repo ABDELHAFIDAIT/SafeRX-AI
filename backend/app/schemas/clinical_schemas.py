@@ -6,13 +6,12 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PATIENT
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Schémas Patient ───────────────────────────────────────────────────────────
 
 class PatientBase(BaseModel):
+    # Champs communs à la création et à la lecture d'un patient
     birthdate:            date
-    gender:               str = Field(..., pattern="^(M|F|O)$")
+    gender:               str = Field(..., pattern="^(M|F|O)$")  # M=Masculin, F=Féminin, O=Autre
     weight_kg:            Optional[Decimal] = None
     height_cm:            Optional[Decimal] = None
     creatinine_clearance: Optional[Decimal] = None
@@ -25,16 +24,19 @@ class PatientBase(BaseModel):
     @field_validator("gestational_weeks")
     @classmethod
     def check_gestational_weeks(cls, v, info):
+        # Valide que la semaine de grossesse est dans la plage physiologique 1–42
         if v is not None and not (1 <= v <= 42):
             raise ValueError("gestational_weeks doit être entre 1 et 42")
         return v
 
 
 class PatientCreate(PatientBase):
+    # Ajoute l'identifiant FHIR optionnel lors de la création
     fhir_patient_id: Optional[uuid.UUID] = None
 
 
 class PatientUpdate(BaseModel):
+    # Mise à jour partielle — seuls les champs cliniques sont modifiables
     weight_kg:            Optional[Decimal] = None
     height_cm:            Optional[Decimal] = None
     creatinine_clearance: Optional[Decimal] = None
@@ -53,18 +55,16 @@ class PatientOut(PatientBase):
     model_config = {"from_attributes": True}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PRESCRIPTION LINE
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Schémas Ligne de Prescription ────────────────────────────────────────────
 
 class PrescriptionLineBase(BaseModel):
     drug_id:       int
     dci:           str = Field(..., min_length=1, max_length=255)
     dose_mg:       Decimal = Field(..., gt=0, description="Dose normalisée en mg")
-    dose_unit_raw: Optional[str]  = None
+    dose_unit_raw: Optional[str]  = None                              # unité saisie avant normalisation
     frequency:     Optional[str]  = None
     route:         Optional[str]  = None
-    duration_days: Optional[int]  = Field(None, ge=1, le=3650)
+    duration_days: Optional[int]  = Field(None, ge=1, le=3650)        # durée max 10 ans
 
 
 class PrescriptionLineCreate(PrescriptionLineBase):
@@ -72,13 +72,14 @@ class PrescriptionLineCreate(PrescriptionLineBase):
 
 
 class CdsAlertOut(BaseModel):
+    # Alerte CDS retournée dans la réponse — inclut les champs IA si disponibles
     id:              int
     alert_type:      str
     severity:        str
     title:           str
-    detail:          Optional[str]    = None
-    rag_explanation: Optional[str]    = None
-    ai_ignore_proba: Optional[Decimal] = None
+    detail:          Optional[str]     = None
+    rag_explanation: Optional[str]     = None    # explication LLM générée par le RAG
+    ai_ignore_proba: Optional[Decimal] = None    # proba d'être ignoré selon la LR
     created_at:      datetime
 
     model_config = {"from_attributes": True}
@@ -92,13 +93,11 @@ class PrescriptionLineOut(PrescriptionLineBase):
     model_config = {"from_attributes": True}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PRESCRIPTION
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Schémas Prescription ──────────────────────────────────────────────────────
 
 class PrescriptionCreate(BaseModel):
     patient_id:     int
-    lines:          List[PrescriptionLineCreate] = Field(..., min_length=1)
+    lines:          List[PrescriptionLineCreate] = Field(..., min_length=1)  # au moins 1 ligne requise
     fhir_bundle_id: Optional[uuid.UUID] = None
     hook_event:     Optional[str]       = "order-sign"
 
@@ -108,7 +107,7 @@ class PrescriptionOut(BaseModel):
     patient_id:     int
     doctor_id:      int
     fhir_bundle_id: Optional[uuid.UUID] = None
-    status:         str
+    status:         str                             # "draft" | "alerts" | "safe"
     hook_event:     Optional[str]       = None
     created_at:     datetime
     lines:          List[PrescriptionLineOut] = []
@@ -116,11 +115,10 @@ class PrescriptionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-
 class CdsResponse(BaseModel):
-    """Réponse structurée de l'analyse CDS Hooks."""
+    # Réponse structurée de l'analyse CDS Hooks — retournée au frontend après création
     prescription_id: int
-    status:          str
+    status:          str                  # "safe" si aucune alerte, "alerts" sinon
     alert_count:     int
     alerts:          List[CdsAlertOut]
     prescription:    PrescriptionOut

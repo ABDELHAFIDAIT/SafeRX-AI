@@ -1,19 +1,14 @@
-"""
-SafeRx AI — Schemas Pydantic : Audit trail
-"""
 from __future__ import annotations
-
 from datetime import datetime
 from typing import Literal
-
 from pydantic import BaseModel, field_validator
 
-
+# Ensemble des décisions valides — utilisé pour la validation côté schema
 VALID_DECISIONS = {"ACCEPTED", "IGNORED", "OVERRIDE"}
 
 
 class AuditCreate(BaseModel):
-    """Payload envoyé par le frontend pour logger une décision."""
+    # Payload envoyé par le frontend pour enregistrer la décision du praticien sur une alerte
     alert_id:        int
     prescription_id: int
     decision:        Literal["ACCEPTED", "IGNORED", "OVERRIDE"]
@@ -22,6 +17,7 @@ class AuditCreate(BaseModel):
     @field_validator("justification")
     @classmethod
     def justification_required_for_override(cls, v, info):
+        # Bloque un OVERRIDE sans justification — contrainte métier obligatoire
         decision = info.data.get("decision")
         if decision == "OVERRIDE" and not (v and v.strip()):
             raise ValueError("Une justification est obligatoire pour un OVERRIDE.")
@@ -29,6 +25,7 @@ class AuditCreate(BaseModel):
 
 
 class AuditOut(BaseModel):
+    # Schéma de réponse complet incluant le résultat de la validation sémantique LLM
     id:                     int
     alert_id:               int | None
     prescription_id:        int | None
@@ -38,16 +35,14 @@ class AuditOut(BaseModel):
     alert_severity:         str | None
     alert_title:            str | None
     justification:          str | None
-    # ── §3.3 Validation sémantique ──────────────────────────────
-    justification_valid:    str | None = None   # "valid" | "noise" | None
-    justification_feedback: str | None = None   # feedback LLM
-    # ────────────────────────────────────────────────────────────
+    justification_valid:    str | None = None   # "valid" | "noise" | None selon l'analyse LLM
+    justification_feedback: str | None = None   # retour textuel court du LLM
     created_at:             datetime
 
     model_config = {"from_attributes": True}
 
 
 class AuditBulkCreate(BaseModel):
-    """Permet de logger toutes les décisions d'une prescription en une seule requête."""
+    # Permet de logger toutes les décisions d'une prescription en une seule requête
     prescription_id: int
     decisions: list[AuditCreate]

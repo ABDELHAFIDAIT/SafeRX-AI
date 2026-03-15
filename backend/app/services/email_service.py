@@ -7,28 +7,30 @@ from backend.app.core.config import settings
 
 
 def generate_password(length: int = 12) -> str:
+    # Génère un mot de passe sécurisé avec au moins 1 MAJ, 1 chiffre et 1 caractère spécial
     alphabet = string.ascii_letters + string.digits + "!@#$%&*"
     password = [
-        secrets.choice(string.ascii_uppercase),
-        secrets.choice(string.digits),
-        secrets.choice("!@#$%&*"),
+        secrets.choice(string.ascii_uppercase),  # garantit une majuscule
+        secrets.choice(string.digits),            # garantit un chiffre
+        secrets.choice("!@#$%&*"),                # garantit un caractère spécial
     ]
     password += [secrets.choice(alphabet) for _ in range(length - 3)]
-    secrets.SystemRandom().shuffle(password)
+    secrets.SystemRandom().shuffle(password)  # mélange aléatoire cryptographiquement sûr
     return "".join(password)
 
 
-
 def send_credentials_email(to_email: str, first_name: str, role: str, plain_password: str) -> None:
+    # Traduit le rôle technique en label lisible pour l'affichage dans l'email
     role_labels = {
-        "doctor": "Médecin",
+        "doctor":     "Médecin",
         "pharmacist": "Pharmacien",
-        "admin": "Administrateur",
+        "admin":      "Administrateur",
     }
     role_label = role_labels.get(role, role.capitalize())
 
     subject = "SafeRx AI — Vos identifiants de connexion"
 
+    # Template HTML de l'email avec card stylisée et avertissement changement de MDP
     html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:32px;">
@@ -86,16 +88,18 @@ def send_credentials_email(to_email: str, first_name: str, role: str, plain_pass
     </html>
     """
 
+    # Construit le message MIME multipart avec encodage HTML
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = settings.SMTP_FROM_EMAIL
-    msg["To"] = to_email
+    msg["From"]    = settings.SMTP_FROM_EMAIL
+    msg["To"]      = to_email
     msg.attach(MIMEText(html_body, "html"))
 
+    # Connexion SMTP avec TLS et authentification optionnelle selon la config
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
         server.ehlo()
         if settings.SMTP_TLS:
-            server.starttls()
+            server.starttls()  # chiffrement de la connexion si configuré
         if settings.SMTP_USER and settings.SMTP_PASSWORD:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())

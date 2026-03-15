@@ -10,3 +10,16 @@ python-dotenv
 sqlalchemy
 psycopg2-binary
 requests
+scikit-learn
+langchain
+langchain-core
+langchain-ollama
+langchain-classic
+langchain-google-genai
+langchain-qdrant
+langchain-huggingface
+sentence-transformers
+langchain-community
+langchain-chroma
+langchain-experimental
+langchain-unstructured

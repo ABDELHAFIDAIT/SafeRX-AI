@@ -1,9 +1,24 @@
+/**
+ * SafeRx AI — CdsResultPanel avec Audit Trail
+ * ─────────────────────────────────────────────
+ * Remplace le composant CdsResultPanel dans DoctorDashboard.jsx
+ *
+ * Flux utilisateur :
+ *   1. Prescription soumise → modal s'ouvre avec les alertes
+ *   2. Pour chaque alerte, le médecin choisit : ACCEPTED / IGNORED / OVERRIDE
+ *   3. OVERRIDE → champ justification obligatoire
+ *   4. Bouton "Confirmer les décisions" → POST /audit/bulk
+ *   5. Toutes les décisions loggées → modal se ferme
+ *
+ * Import dans DoctorDashboard.jsx :
+ *   import CdsResultPanel from "./CdsResultPanel";
+ */
 import { useState } from "react";
 import {
     ShieldAlert, ShieldCheck, X, CheckCircle2,
     XCircle, AlertTriangle, Info, ChevronDown,
     Siren, TriangleAlert, Send, FileText, Plus,
-    AlertCircle, ClipboardCheck
+    AlertCircle, ClipboardCheck, Sparkles, TrendingDown
 } from "lucide-react";
 import api from "../api/api";
 
@@ -254,6 +269,21 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${cfg.badge}`}>
                                                     {ALERT_TYPE_LABEL[alert.alert_type] || alert.alert_type}
                                                 </span>
+                                                {/* Badge LR — probabilité d'ignorance */}
+                                                {alert.ai_ignore_proba !== null &&
+                                                 alert.ai_ignore_proba !== undefined && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium flex items-center gap-1
+                                                        ${alert.ai_ignore_proba >= 0.7
+                                                            ? "bg-slate-700/40 text-slate-400 border-slate-600/30"   // probablement ignoré
+                                                            : "bg-violet-500/10 text-violet-300 border-violet-500/20" // probablement pris en compte
+                                                        }`}
+                                                        title={`Score IA : ${Math.round(alert.ai_ignore_proba * 100)}% de probabilité d'être ignoré`}>
+                                                        <TrendingDown size={9} />
+                                                        {alert.ai_ignore_proba >= 0.7
+                                                            ? `Souvent ignoré (${Math.round(alert.ai_ignore_proba * 100)}%)`
+                                                            : `Pertinent (${Math.round((1 - alert.ai_ignore_proba) * 100)}%)`}
+                                                    </span>
+                                                )}
                                                 {/* Badge décision si déjà choisie */}
                                                 {myDecision && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium
@@ -273,9 +303,24 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
                                     {isOpen && (
                                         <div className="px-4 pb-4 border-t border-white/5 pt-3">
                                             {/* Texte clinique */}
-                                            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                                            <p className="text-xs text-slate-400 leading-relaxed mb-3">
                                                 {alert.detail}
                                             </p>
+
+                                            {/* ── Explication RAG ──────────────────── */}
+                                            {alert.rag_explanation && (
+                                                <div className="mb-4 p-3 rounded-lg border border-violet-500/20 bg-violet-950/30">
+                                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                                        <Sparkles size={11} className="text-violet-400" />
+                                                        <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">
+                                                            Analyse SafeRx AI
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-violet-200 leading-relaxed">
+                                                        {alert.rag_explanation}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             {/* Boutons de décision */}
                                             <div className="space-y-2">
@@ -322,6 +367,29 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
                                                                 <AlertTriangle size={9} /> Justification requise pour un override
                                                             </p>
                                                         )}
+                                                        {/* Hint pédagogique pour guider le médecin */}
+                                                        {myDecision === "OVERRIDE" && justifs[alert.id]?.trim().length > 0 &&
+                                                         justifs[alert.id].trim().length < 10 && (
+                                                            <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                                                                <Info size={9} /> Précisez le contexte clinique (bénéfice/risque, adaptation posologique…)
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ── Feedback validation sémantique (post-soumission) ── */}
+                                                {alert.justification_valid && (
+                                                    <div className={`mt-3 px-3 py-2 rounded-lg border text-xs flex items-start gap-2
+                                                        ${alert.justification_valid === "valid"
+                                                            ? "bg-emerald-950/40 border-emerald-500/25 text-emerald-300"
+                                                            : "bg-red-950/40 border-red-500/25 text-red-300"}`}>
+                                                        {alert.justification_valid === "valid"
+                                                            ? <CheckCircle2 size={11} className="shrink-0 mt-0.5" />
+                                                            : <AlertTriangle size={11} className="shrink-0 mt-0.5" />}
+                                                        <span>
+                                                            <strong>{alert.justification_valid === "valid" ? "Justification valide" : "Justification insuffisante"}</strong>
+                                                            {alert.justification_feedback && ` — ${alert.justification_feedback}`}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>

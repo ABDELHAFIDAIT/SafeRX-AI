@@ -1,24 +1,33 @@
 from __future__ import annotations
+import logging
+from datetime import date
 from sqlalchemy.orm import Session, selectinload
 from backend.app.models.cds_alert import CdsAlert
 from backend.app.models.drug import Drug, DciComponent
+from backend.app.models.drug_interaction import DrugInteraction
 from backend.app.models.patient import Patient
 from backend.app.models.prescription import Prescription, PrescriptionLine
 from backend.app.models.user import User
 from backend.app.schemas.clinical_schemas import PrescriptionCreate
-from backend.app.services.cds_engine import analyse_prescription
+from backend.app.services.cds_engine import analyse_prescription, _normalize_for_ansm
+from backend.app.services.ai_service import enrich_alerts_with_rag, RAG_ENABLED
+from backend.app.services.lr_service import score_alerts
+
+
+logger = logging.getLogger(__name__)
+
+
+def _age_years(birthdate: date) -> int | None:
+    if not birthdate:
+        return None
+    today = date.today()
+    return today.year - birthdate.year - (
+        (today.month, today.day) < (birthdate.month, birthdate.day)
+    )
 
 
 
 def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User ) -> Prescription:
-    """
-    1. Crée l'en-tête de prescription
-    2. Crée les lignes de médicaments
-    3. Lance l'analyse CDS sur chaque ligne
-    4. Persiste les alertes
-    5. Met à jour le status : 'safe' ou 'alerts'
-    6. Retourne la prescription complète (lignes + alertes)
-    """
     # ── Vérifier que le patient existe ───────────────────────────────────────
     patient: Patient | None = db.query(Patient).get(payload.patient_id)
     if not patient:
@@ -35,40 +44,95 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
 
     # ── Créer l'en-tête ──────────────────────────────────────────────────────
     prescription = Prescription(
-        patient_id=payload.patient_id,
-        doctor_id=doctor.id,
-        fhir_bundle_id=payload.fhir_bundle_id,
-        hook_event=payload.hook_event or "order-sign",
-        status="draft",
+        patient_id    = payload.patient_id,
+        doctor_id     = doctor.id,
+        fhir_bundle_id= payload.fhir_bundle_id,
+        hook_event    = payload.hook_event or "order-sign",
+        status        = "draft",
     )
     db.add(prescription)
-    db.flush()  # obtenir prescription.id sans commit
+    db.flush()
 
     # ── Créer les lignes ─────────────────────────────────────────────────────
     lines: list[PrescriptionLine] = []
     for line_data in payload.lines:
         line = PrescriptionLine(
-            prescription_id=prescription.id,
-            drug_id=line_data.drug_id,
-            dci=line_data.dci,
-            dose_mg=line_data.dose_mg,
-            dose_unit_raw=line_data.dose_unit_raw,
-            frequency=line_data.frequency,
-            route=line_data.route,
-            duration_days=line_data.duration_days,
+            prescription_id = prescription.id,
+            drug_id         = line_data.drug_id,
+            dci             = line_data.dci,
+            dose_mg         = line_data.dose_mg,
+            dose_unit_raw   = line_data.dose_unit_raw,
+            frequency       = line_data.frequency,
+            route           = line_data.route,
+            duration_days   = line_data.duration_days,
         )
         db.add(line)
         lines.append(line)
 
-    db.flush()  # obtenir les line.id
+    db.flush()
 
     # ── Moteur de règles CDS ─────────────────────────────────────────────────
     alerts = analyse_prescription(db=db, patient=patient, lines=lines)
 
+    # ── Enrichissement RAG (best-effort, ne bloque pas si LLM indisponible) ──
+    if RAG_ENABLED and alerts:
+        try:
+            drug_ids     = [l.drug_id for l in lines]
+            drugs_by_id  = {
+                d.id: d for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
+            }
+            all_dcis = set()
+            for line in lines:
+                comps = (
+                    db.query(DciComponent)
+                    .filter(DciComponent.drug_id == line.drug_id)
+                    .all()
+                )
+                for comp in comps:
+                    all_dcis.add(_normalize_for_ansm(comp.dci))
+
+            interactions_raw = (
+                db.query(DrugInteraction)
+                .filter(
+                    DrugInteraction.dci_a.in_(all_dcis) |
+                    DrugInteraction.dci_b.in_(all_dcis)
+                )
+                .all()
+            ) if len(all_dcis) >= 2 else []
+
+            interactions_ctx = {
+                (_normalize_for_ansm(i.dci_a), _normalize_for_ansm(i.dci_b)): i
+                for i in interactions_raw
+            }
+
+            patient_age = _age_years(patient.birthdate)
+
+            enrich_alerts_with_rag(
+                alerts            = alerts,
+                interactions_ctx  = interactions_ctx,
+                drugs_ctx         = drugs_by_id,
+                patient_age       = patient_age,
+            )
+            logger.info(
+                f"RAG enrichissement terminé — {sum(1 for a in alerts if a.rag_explanation)} "
+                f"/ {len(alerts)} alertes enrichies"
+            )
+        except Exception as e:
+            logger.error(f"RAG enrichissement échoué (non bloquant) : {e}")
+
+    # ── Scoring Logistic Regression — ai_ignore_proba (best-effort) ──────
+    try:
+        score_alerts(alerts)
+        scored = sum(1 for a in alerts if a.ai_ignore_proba is not None)
+        if scored:
+            logger.info(f"[LR] Scoring terminé — {scored}/{len(alerts)} alertes scorées")
+    except Exception as e:
+        logger.error(f"[LR] Scoring échoué (non bloquant) : {e}")
+
+    # ── Persister les alertes (enrichies ou non) ─────────────────────────────
     for alert in alerts:
         db.add(alert)
 
-    # ── Mettre à jour le status de la prescription ───────────────────────────
     prescription.status = "alerts" if alerts else "safe"
 
     db.commit()
@@ -100,7 +164,7 @@ def get_prescription(db: Session, prescription_id: int) -> Prescription | None:
 
 
 
-def list_prescriptions_for_patient( db: Session, patient_id: int, skip: int = 0, limit: int = 20 ) -> list[Prescription]:
+def list_prescriptions_for_patient( db: Session, patient_id: int, skip: int  = 0, limit: int = 20 ) -> list[Prescription]:
     return (
         db.query(Prescription)
         .filter(Prescription.patient_id == patient_id)
@@ -109,4 +173,3 @@ def list_prescriptions_for_patient( db: Session, patient_id: int, skip: int = 0,
         .limit(limit)
         .all()
     )
-

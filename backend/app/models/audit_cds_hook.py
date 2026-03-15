@@ -1,8 +1,21 @@
+"""
+SafeRx AI — Modèle audit_cds_hooks
+════════════════════════════════════
+Trace chaque décision du praticien face à une alerte CDS.
+Exigence légale HDS — immuable (pas de UPDATE/DELETE).
+
+Décisions possibles :
+  ACCEPTED  — Le praticien prend note de l'alerte et adapte la prescription
+  IGNORED   — Le praticien ignore l'alerte (justification recommandée)
+  OVERRIDE  — Le praticien maintient la prescription malgré l'alerte (justification obligatoire)
+"""
 from __future__ import annotations
+
 from sqlalchemy import (
     Column, Integer, String, Text,
     ForeignKey, DateTime, func
 )
+
 from backend.app.db.base import Base
 
 
@@ -41,7 +54,14 @@ class AuditCdsHook(Base):
     alert_title     = Column(String(255), nullable=True)
 
     # Justification libre (obligatoire pour OVERRIDE, recommandée pour IGNORED)
-    justification   = Column(Text, nullable=True)
+    justification          = Column(Text,    nullable=True)
+
+    # ── Validation sémantique (§3.3) ──────────────────────────────────────
+    # True  = justification médicalement valide selon le LLM
+    # False = bruit / justification insuffisante
+    # None  = pas encore analysé ou non applicable
+    justification_valid    = Column(String(10), nullable=True)   # "valid" | "noise" | None
+    justification_feedback = Column(Text,       nullable=True)   # explication courte du LLM
 
     # ── Horodatage ────────────────────────────────────────────────────────
     created_at      = Column(

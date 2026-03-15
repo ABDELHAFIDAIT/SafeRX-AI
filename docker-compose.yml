@@ -82,6 +82,23 @@ services:
     depends_on:
       - db
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: saferxai_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pour utiliser le GPU (optionnel) :
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
   api:
     build: .
     container_name: saferxai_backend
@@ -116,3 +133,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

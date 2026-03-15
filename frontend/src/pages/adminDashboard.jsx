@@ -7,7 +7,7 @@ import {
     Clock, Filter, MoreVertical, Mail, Lock, RefreshCw,
     AlertTriangle, BarChart3, Shield, Siren
 } from "lucide-react";
-import authService from "../services/authService";
+import authService from "../services/AuthService";
 import api from "../api/api";
 
 /* ─────────────────────────────────────────────────────────
@@ -489,13 +489,15 @@ const AuditView = () => {
 
     // Adapter le format API → format UI
     const mapped = logs.map(entry => ({
-        id:        entry.id,
-        timestamp: entry.created_at,
-        action:    decisionToAction[entry.decision] || entry.decision,
-        severity:  entry.alert_severity || "NONE",
-        detail:    entry.alert_title || "—",
-        drug:      entry.alert_type   || "—",
-        justif:    entry.justification,
+        id:                     entry.id,
+        timestamp:              entry.created_at,
+        action:                 decisionToAction[entry.decision] || entry.decision,
+        severity:               entry.alert_severity || "NONE",
+        detail:                 entry.alert_title    || "—",
+        drug:                   entry.alert_type     || "—",
+        justif:                 entry.justification,
+        justification_valid:    entry.justification_valid,
+        justification_feedback: entry.justification_feedback,
     }));
 
     const filtered = filter === "all"
@@ -562,7 +564,23 @@ const AuditView = () => {
                                 </div>
                                 <p className="text-xs text-slate-500">{log.detail}</p>
                                 {log.justif && (
-                                    <p className="text-xs text-amber-600 mt-1 italic">Justification : {log.justif}</p>
+                                    <div className="mt-1.5 space-y-1">
+                                        <p className="text-xs text-amber-600 italic">
+                                            Justification : {log.justif}
+                                        </p>
+                                        {/* Badge validation sémantique §3.3 */}
+                                        {log.justification_valid && (
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border
+                                                ${log.justification_valid === "valid"
+                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                    : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                {log.justification_valid === "valid" ? "✓ Justification valide" : "✗ Justification insuffisante"}
+                                                {log.justification_feedback && (
+                                                    <span className="font-normal opacity-80">— {log.justification_feedback}</span>
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                             <div className="shrink-0 text-right hidden sm:block">

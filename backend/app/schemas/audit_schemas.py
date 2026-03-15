@@ -1,6 +1,11 @@
+"""
+SafeRx AI — Schemas Pydantic : Audit trail
+"""
 from __future__ import annotations
+
 from datetime import datetime
 from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -24,16 +29,20 @@ class AuditCreate(BaseModel):
 
 
 class AuditOut(BaseModel):
-    id:             int
-    alert_id:       int | None
-    prescription_id: int | None
-    doctor_id:      int | None
-    decision:       str
-    alert_type:     str | None
-    alert_severity: str | None
-    alert_title:    str | None
-    justification:  str | None
-    created_at:     datetime
+    id:                     int
+    alert_id:               int | None
+    prescription_id:        int | None
+    doctor_id:              int | None
+    decision:               str
+    alert_type:             str | None
+    alert_severity:         str | None
+    alert_title:            str | None
+    justification:          str | None
+    # ── §3.3 Validation sémantique ──────────────────────────────
+    justification_valid:    str | None = None   # "valid" | "noise" | None
+    justification_feedback: str | None = None   # feedback LLM
+    # ────────────────────────────────────────────────────────────
+    created_at:             datetime
 
     model_config = {"from_attributes": True}
 
@@ -42,4 +51,3 @@ class AuditBulkCreate(BaseModel):
     """Permet de logger toutes les décisions d'une prescription en une seule requête."""
     prescription_id: int
     decisions: list[AuditCreate]
-

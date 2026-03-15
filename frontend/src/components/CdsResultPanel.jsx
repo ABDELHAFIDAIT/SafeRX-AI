@@ -1,17 +1,8 @@
 /**
- * SafeRx AI — CdsResultPanel avec Audit Trail
- * ─────────────────────────────────────────────
- * Remplace le composant CdsResultPanel dans DoctorDashboard.jsx
- *
- * Flux utilisateur :
- *   1. Prescription soumise → modal s'ouvre avec les alertes
- *   2. Pour chaque alerte, le médecin choisit : ACCEPTED / IGNORED / OVERRIDE
- *   3. OVERRIDE → champ justification obligatoire
- *   4. Bouton "Confirmer les décisions" → POST /audit/bulk
- *   5. Toutes les décisions loggées → modal se ferme
- *
- * Import dans DoctorDashboard.jsx :
- *   import CdsResultPanel from "./CdsResultPanel";
+ * SafeRx AI — CdsResultPanel (thème clair)
+ * ──────────────────────────────────────────
+ * Modal d'analyse CDS cohérent avec le design system AdminDashboard :
+ *   bg-white, border-slate-100, textes slate-700/800, accents colorés légers
  */
 import { useState } from "react";
 import {
@@ -22,31 +13,34 @@ import {
 } from "lucide-react";
 import api from "../api/api";
 
-/* ── Config sévérité ─────────────────────────────────────────────────────── */
+/* ── Config sévérité — version light ────────────────────────────────── */
 const SEVERITY_CONFIG = {
-    MAJOR:    {
-        label: "Critique",
-        bg: "bg-red-950/60",
-        border: "border-red-500/40",
-        text: "text-red-300",
-        badge: "bg-red-500/20 text-red-300 border-red-500/30",
-        icon: Siren,
+    MAJOR: {
+        label:      "Critique",
+        bg:         "bg-red-50",
+        border:     "border-red-200",
+        text:       "text-red-700",
+        badge:      "bg-red-100 text-red-700 border-red-200",
+        headerBg:   "bg-red-50 border-b border-red-100",
+        icon:       Siren,
     },
     MODERATE: {
-        label: "Modérée",
-        bg: "bg-amber-950/60",
-        border: "border-amber-500/40",
-        text: "text-amber-300",
-        badge: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-        icon: TriangleAlert,
+        label:      "Modérée",
+        bg:         "bg-amber-50",
+        border:     "border-amber-200",
+        text:       "text-amber-700",
+        badge:      "bg-amber-100 text-amber-700 border-amber-200",
+        headerBg:   "bg-amber-50 border-b border-amber-100",
+        icon:       TriangleAlert,
     },
     MINOR: {
-        label: "Mineure",
-        bg: "bg-blue-950/60",
-        border: "border-blue-500/40",
-        text: "text-blue-300",
-        badge: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-        icon: Info,
+        label:      "Mineure",
+        bg:         "bg-blue-50",
+        border:     "border-blue-200",
+        text:       "text-blue-700",
+        badge:      "bg-blue-100 text-blue-700 border-blue-200",
+        headerBg:   "bg-blue-50 border-b border-blue-100",
+        icon:       Info,
     },
 };
 
@@ -56,45 +50,45 @@ const ALERT_TYPE_LABEL = {
     CONTRA_INDICATION:  "Contre-indication",
     REDUNDANT_DCI:      "Redondance DCI",
     POSOLOGY:           "Posologie",
+    RENAL:              "Insuffisance rénale",
 };
 
-/* ── Décisions ───────────────────────────────────────────────────────────── */
 const DECISION_CONFIG = {
     ACCEPTED: {
-        label: "Pris en compte",
-        icon: CheckCircle2,
-        style: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20",
-        activeStyle: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200 ring-1 ring-emerald-500/30",
+        label:       "Pris en compte",
+        icon:        CheckCircle2,
+        style:       "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
+        activeStyle: "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200",
     },
     IGNORED: {
-        label: "Ignorer",
-        icon: XCircle,
-        style: "bg-slate-700/30 border-slate-600/30 text-slate-400 hover:bg-slate-700/50",
-        activeStyle: "bg-slate-600/40 border-slate-500/50 text-slate-200 ring-1 ring-slate-500/30",
+        label:       "Ignorer",
+        icon:        XCircle,
+        style:       "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100",
+        activeStyle: "bg-slate-700 border-slate-700 text-white shadow-md",
     },
     OVERRIDE: {
-        label: "Maintenir quand même",
-        icon: AlertTriangle,
-        style: "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20",
-        activeStyle: "bg-amber-500/20 border-amber-400/50 text-amber-300 ring-1 ring-amber-500/30",
+        label:       "Maintenir quand même",
+        icon:        AlertTriangle,
+        style:       "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100",
+        activeStyle: "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-200",
     },
 };
 
 const Spinner = ({ size = 16 }) => (
     <svg style={{ width: size, height: size }} className="animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
     </svg>
 );
 
-/* ── Composant principal ─────────────────────────────────────────────────── */
+/* ── Composant principal ─────────────────────────────────────────────── */
 export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
-    const [expanded,     setExpanded]     = useState({});
-    const [decisions,    setDecisions]    = useState({});     // alertId → "ACCEPTED" | "IGNORED" | "OVERRIDE"
-    const [justifs,      setJustifs]      = useState({});     // alertId → string
-    const [submitting,   setSubmitting]   = useState(false);
-    const [submitted,    setSubmitted]    = useState(false);
-    const [submitError,  setSubmitError]  = useState("");
+    const [expanded,    setExpanded]    = useState({});
+    const [decisions,   setDecisions]   = useState({});
+    const [justifs,     setJustifs]     = useState({});
+    const [submitting,  setSubmitting]  = useState(false);
+    const [submitted,   setSubmitted]   = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     const isSafe     = result.alert_count === 0;
     const alerts     = result.alerts || [];
@@ -102,75 +96,54 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
     const moderateAlerts = alerts.filter(a => a.severity === "MODERATE");
     const minorAlerts    = alerts.filter(a => a.severity === "MINOR");
 
-    const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
-
+    const toggle     = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
     const setDecision = (alertId, decision) => {
         setDecisions(p => ({ ...p, [alertId]: decision }));
-        // Reset justif si on passe d'OVERRIDE à autre chose
-        if (decision !== "OVERRIDE") {
-            setJustifs(p => { const n = { ...p }; delete n[alertId]; return n; });
-        }
+        if (decision !== "OVERRIDE") setJustifs(p => { const n = { ...p }; delete n[alertId]; return n; });
     };
 
-    /* ── Validation avant confirmation ──────────────────────────────────── */
-    const allDecided = alerts.every(a => decisions[a.id]);
-    const overridesMissingJustif = alerts.filter(
-        a => decisions[a.id] === "OVERRIDE" && !(justifs[a.id]?.trim())
-    );
-    const canConfirm = allDecided && overridesMissingJustif.length === 0;
+    const allDecided             = alerts.every(a => decisions[a.id]);
+    const overridesMissingJustif = alerts.filter(a => decisions[a.id] === "OVERRIDE" && !justifs[a.id]?.trim());
+    const canConfirm             = allDecided && overridesMissingJustif.length === 0;
 
-    /* ── Soumettre l'audit bulk ──────────────────────────────────────────── */
     const confirmDecisions = async () => {
-        setSubmitting(true);
-        setSubmitError("");
+        setSubmitting(true); setSubmitError("");
         try {
-            const payload = {
+            await api.post("/audit/bulk", {
                 prescription_id: result.prescription_id,
                 decisions: alerts.map(alert => ({
-                    alert_id:       alert.id,
+                    alert_id:        alert.id,
                     prescription_id: result.prescription_id,
-                    decision:       decisions[alert.id],
-                    justification:  justifs[alert.id] || null,
+                    decision:        decisions[alert.id],
+                    justification:   justifs[alert.id] || null,
                 })),
-            };
-            await api.post("/audit/bulk", payload);
+            });
             setSubmitted(true);
         } catch (e) {
-            setSubmitError(
-                e.response?.data?.detail || "Erreur lors de l'enregistrement de l'audit."
-            );
-        } finally {
-            setSubmitting(false);
-        }
+            setSubmitError(e.response?.data?.detail || "Erreur lors de l'enregistrement de l'audit.");
+        } finally { setSubmitting(false); }
     };
 
-    /* ── Vue "succès audit" ─────────────────────────────────────────────── */
+    /* ── Écran succès audit ──────────────────────────────────────────── */
     if (submitted) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                 style={{ background: "rgba(2,8,20,0.85)", backdropFilter: "blur(8px)" }}>
-                <div className="w-full max-w-md rounded-2xl border border-emerald-700/30 overflow-hidden"
-                     style={{ background: "#0d1520" }}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-2xl border border-slate-100 shadow-2xl bg-white overflow-hidden">
                     <div className="px-8 py-10 text-center">
-                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
-                            <ClipboardCheck size={28} className="text-emerald-400" />
+                        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+                            <ClipboardCheck size={28} className="text-emerald-600" />
                         </div>
-                        <h2 className="text-lg font-semibold text-slate-100 mb-2">
-                            Décisions enregistrées
-                        </h2>
-                        <p className="text-sm text-slate-400 mb-8">
-                            {alerts.length} décision{alerts.length > 1 ? "s" : ""} loggée{alerts.length > 1 ? "s" : ""}
-                            dans le journal d'audit — prescription #{result.prescription_id}
+                        <h2 className="text-lg font-bold text-slate-800 mb-2">Décisions enregistrées</h2>
+                        <p className="text-sm text-slate-500 mb-8">
+                            {alerts.length} décision{alerts.length > 1 ? "s" : ""} loggée{alerts.length > 1 ? "s" : ""} dans le journal d'audit — prescription #{result.prescription_id}
                         </p>
                         <div className="flex gap-3 justify-center">
-                            <button
-                                onClick={onNewPrescription}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all">
+                            <button onClick={onNewPrescription}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-md shadow-blue-200">
                                 <Plus size={14} /> Nouvelle prescription
                             </button>
-                            <button
-                                onClick={onClose}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-300 border border-slate-600/50 hover:border-slate-500/70 transition-all">
+                            <button onClick={onClose}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all">
                                 <FileText size={14} /> Fermer
                             </button>
                         </div>
@@ -181,68 +154,66 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ background: "rgba(2,8,20,0.85)", backdropFilter: "blur(8px)" }}>
-            <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl border border-slate-700/60 flex flex-col"
-                 style={{ background: "#0d1520" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+            <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl border border-slate-100 shadow-2xl flex flex-col bg-white">
 
-                {/* ── Header ───────────────────────────────────────────── */}
-                <div className={`px-6 py-4 flex items-center justify-between border-b
-                    ${isSafe ? "border-emerald-700/40 bg-emerald-950/30" : "border-red-700/30 bg-red-950/20"}`}>
+                {/* ── Header ───────────────────────────────────────── */}
+                <div className={`px-6 py-4 flex items-center justify-between
+                    ${isSafe ? "bg-emerald-50 border-b border-emerald-100" : "bg-white border-b border-slate-100"}`}>
                     <div className="flex items-center gap-3">
                         {isSafe
-                            ? <ShieldCheck size={22} className="text-emerald-400" />
-                            : <ShieldAlert size={22} className="text-red-400" />}
+                            ? <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                                <ShieldCheck size={18} className="text-emerald-600" />
+                              </div>
+                            : <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                                <ShieldAlert size={18} className="text-red-600" />
+                              </div>}
                         <div>
-                            <h2 className={`font-semibold text-base ${isSafe ? "text-emerald-300" : "text-red-300"}`}>
-                                {isSafe
-                                    ? "Prescription sûre"
-                                    : `${result.alert_count} alerte${result.alert_count > 1 ? "s" : ""} détectée${result.alert_count > 1 ? "s" : ""}`}
+                            <h2 className={`font-bold text-base ${isSafe ? "text-emerald-800" : "text-slate-800"}`}>
+                                {isSafe ? "Prescription sûre" : `${result.alert_count} alerte${result.alert_count > 1 ? "s" : ""} détectée${result.alert_count > 1 ? "s" : ""}`}
                             </h2>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <p className="text-xs text-slate-500">
                                 Prescription #{result.prescription_id} · Analyse CDS SafeRx
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose}
-                            className="text-slate-500 hover:text-slate-300 transition-colors">
-                        <X size={18} />
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                        <X size={16} />
                     </button>
                 </div>
 
-                {/* ── Barre de comptage ─────────────────────────────────── */}
+                {/* ── Barre de comptage ─────────────────────────────── */}
                 {!isSafe && (
-                    <div className="px-6 py-2.5 flex items-center gap-3 border-b border-slate-700/40 bg-slate-900/20">
+                    <div className="px-6 py-2.5 flex items-center gap-3 border-b border-slate-100 bg-slate-50">
                         {majorAlerts.length > 0 && (
-                            <span className="flex items-center gap-1.5 text-xs font-medium text-red-300 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-100 border border-red-200 px-2.5 py-1 rounded-full">
                                 <Siren size={11} /> {majorAlerts.length} critique{majorAlerts.length > 1 ? "s" : ""}
                             </span>
                         )}
                         {moderateAlerts.length > 0 && (
-                            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full">
                                 <TriangleAlert size={11} /> {moderateAlerts.length} modérée{moderateAlerts.length > 1 ? "s" : ""}
                             </span>
                         )}
                         {minorAlerts.length > 0 && (
-                            <span className="flex items-center gap-1.5 text-xs font-medium text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full">
                                 <Info size={11} /> {minorAlerts.length} mineure{minorAlerts.length > 1 ? "s" : ""}
                             </span>
                         )}
-                        {/* Progression des décisions */}
-                        <span className="ml-auto text-xs text-slate-500">
+                        <span className="ml-auto text-xs text-slate-400">
                             {Object.keys(decisions).length}/{alerts.length} décidé{Object.keys(decisions).length > 1 ? "s" : ""}
                         </span>
                     </div>
                 )}
 
-                {/* ── Corps ────────────────────────────────────────────── */}
-                <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
+                {/* ── Corps ────────────────────────────────────────── */}
+                <div className="overflow-y-auto flex-1 px-4 py-4 space-y-2 bg-slate-50">
                     {isSafe ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
-                                <ShieldCheck size={28} className="text-emerald-400" />
+                            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                                <ShieldCheck size={28} className="text-emerald-600" />
                             </div>
-                            <p className="text-emerald-300 font-medium mb-1">Aucune alerte détectée</p>
+                            <p className="font-semibold text-slate-800 mb-1">Aucune alerte détectée</p>
                             <p className="text-slate-500 text-sm">Prescription conforme aux règles CDS SafeRx.</p>
                         </div>
                     ) : (
@@ -254,29 +225,26 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
 
                             return (
                                 <div key={alert.id}
-                                     className={`rounded-xl border ${cfg.border} ${cfg.bg} overflow-hidden transition-all`}>
+                                    className={`rounded-xl border ${cfg.border} bg-white overflow-hidden transition-all shadow-sm`}>
 
                                     {/* En-tête alerte */}
-                                    <button
-                                        onClick={() => toggle(alert.id)}
-                                        className="w-full px-4 py-3 flex items-start gap-3 text-left">
-                                        <Icon size={15} className={`${cfg.text} mt-0.5 shrink-0`} />
+                                    <button onClick={() => toggle(alert.id)}
+                                        className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-slate-50 transition-colors">
+                                        <div className={`w-7 h-7 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center shrink-0 mt-0.5`}>
+                                            <Icon size={13} className={cfg.text} />
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`text-sm font-medium ${cfg.text}`}>
-                                                    {alert.title}
-                                                </span>
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${cfg.badge}`}>
+                                                <span className="text-sm font-semibold text-slate-800">{alert.title}</span>
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${cfg.badge}`}>
                                                     {ALERT_TYPE_LABEL[alert.alert_type] || alert.alert_type}
                                                 </span>
-                                                {/* Badge LR — probabilité d'ignorance */}
-                                                {alert.ai_ignore_proba !== null &&
-                                                 alert.ai_ignore_proba !== undefined && (
+                                                {/* Badge LR */}
+                                                {alert.ai_ignore_proba !== null && alert.ai_ignore_proba !== undefined && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium flex items-center gap-1
                                                         ${alert.ai_ignore_proba >= 0.7
-                                                            ? "bg-slate-700/40 text-slate-400 border-slate-600/30"   // probablement ignoré
-                                                            : "bg-violet-500/10 text-violet-300 border-violet-500/20" // probablement pris en compte
-                                                        }`}
+                                                            ? "bg-slate-100 text-slate-500 border-slate-200"
+                                                            : "bg-purple-50 text-purple-700 border-purple-200"}`}
                                                         title={`Score IA : ${Math.round(alert.ai_ignore_proba * 100)}% de probabilité d'être ignoré`}>
                                                         <TrendingDown size={9} />
                                                         {alert.ai_ignore_proba >= 0.7
@@ -284,105 +252,86 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
                                                             : `Pertinent (${Math.round((1 - alert.ai_ignore_proba) * 100)}%)`}
                                                     </span>
                                                 )}
-                                                {/* Badge décision si déjà choisie */}
+                                                {/* Badge décision */}
                                                 {myDecision && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium
-                                                        ${myDecision === "ACCEPTED" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" :
-                                                          myDecision === "OVERRIDE" ? "bg-amber-500/15 text-amber-300 border-amber-500/25" :
-                                                                                       "bg-slate-600/30 text-slate-400 border-slate-500/25"}`}>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold
+                                                        ${myDecision === "ACCEPTED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                                                          myDecision === "OVERRIDE" ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                                                                       "bg-slate-100 text-slate-600 border-slate-200"}`}>
                                                         {DECISION_CONFIG[myDecision].label}
                                                     </span>
                                                 )}
                                             </div>
                                         </div>
-                                        <ChevronDown size={13}
-                                            className={`text-slate-500 shrink-0 mt-0.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                                        <ChevronDown size={14} className={`text-slate-400 shrink-0 mt-0.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                                     </button>
 
-                                    {/* Détails + décision */}
+                                    {/* Détails */}
                                     {isOpen && (
-                                        <div className="px-4 pb-4 border-t border-white/5 pt-3">
-                                            {/* Texte clinique */}
-                                            <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                                                {alert.detail}
-                                            </p>
+                                        <div className="px-4 pb-4 border-t border-slate-100 pt-3 bg-white">
+                                            {/* Détail clinique */}
+                                            <p className="text-xs text-slate-600 leading-relaxed mb-3">{alert.detail}</p>
 
                                             {/* ── Explication RAG ──────────────────── */}
                                             {alert.rag_explanation && (
-                                                <div className="mb-4 p-3 rounded-lg border border-violet-500/20 bg-violet-950/30">
+                                                <div className="mb-4 p-3 rounded-xl border border-purple-200 bg-purple-50">
                                                     <div className="flex items-center gap-1.5 mb-1.5">
-                                                        <Sparkles size={11} className="text-violet-400" />
-                                                        <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">
+                                                        <Sparkles size={11} className="text-purple-600" />
+                                                        <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
                                                             Analyse SafeRx AI
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-violet-200 leading-relaxed">
-                                                        {alert.rag_explanation}
-                                                    </p>
+                                                    <p className="text-xs text-purple-800 leading-relaxed">{alert.rag_explanation}</p>
                                                 </div>
                                             )}
 
-                                            {/* Boutons de décision */}
-                                            <div className="space-y-2">
-                                                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
-                                                    Votre décision
-                                                </p>
+                                            {/* Décision */}
+                                            <div>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-semibold">Votre décision</p>
                                                 <div className="flex gap-2 flex-wrap">
-                                                    {Object.entries(DECISION_CONFIG).map(([key, cfg]) => {
-                                                        const DIcon = cfg.icon;
+                                                    {Object.entries(DECISION_CONFIG).map(([key, dcfg]) => {
+                                                        const DIcon    = dcfg.icon;
                                                         const isActive = myDecision === key;
                                                         return (
-                                                            <button
-                                                                key={key}
-                                                                onClick={() => setDecision(alert.id, key)}
-                                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all
-                                                                    ${isActive ? cfg.activeStyle : cfg.style}`}>
-                                                                <DIcon size={12} />
-                                                                {cfg.label}
+                                                            <button key={key} onClick={() => setDecision(alert.id, key)}
+                                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
+                                                                    ${isActive ? dcfg.activeStyle : dcfg.style}`}>
+                                                                <DIcon size={12} /> {dcfg.label}
                                                             </button>
                                                         );
                                                     })}
                                                 </div>
 
-                                                {/* Justification (OVERRIDE obligatoire, IGNORED optionnel) */}
+                                                {/* Justification */}
                                                 {(myDecision === "OVERRIDE" || myDecision === "IGNORED") && (
                                                     <div className="mt-3">
                                                         <textarea
                                                             value={justifs[alert.id] || ""}
                                                             onChange={e => setJustifs(p => ({ ...p, [alert.id]: e.target.value }))}
-                                                            placeholder={
-                                                                myDecision === "OVERRIDE"
-                                                                    ? "Justification obligatoire (contexte clinique, bénéfice/risque…)"
-                                                                    : "Justification facultative…"
-                                                            }
+                                                            placeholder={myDecision === "OVERRIDE"
+                                                                ? "Justification obligatoire (contexte clinique, bénéfice/risque…)"
+                                                                : "Justification facultative…"}
                                                             rows={2}
-                                                            className={`w-full bg-slate-900/60 border rounded-lg px-3 py-2 text-xs text-slate-300
-                                                                placeholder-slate-600 outline-none resize-none transition-colors
+                                                            className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs text-slate-700
+                                                                placeholder-slate-400 outline-none resize-none transition-colors
                                                                 ${myDecision === "OVERRIDE" && !justifs[alert.id]?.trim()
-                                                                    ? "border-amber-500/40 focus:border-amber-400/60"
-                                                                    : "border-slate-600/40 focus:border-slate-500/60"}`}
+                                                                    ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                                                    : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"}`}
                                                         />
                                                         {myDecision === "OVERRIDE" && !justifs[alert.id]?.trim() && (
-                                                            <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                                                            <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
                                                                 <AlertTriangle size={9} /> Justification requise pour un override
-                                                            </p>
-                                                        )}
-                                                        {/* Hint pédagogique pour guider le médecin */}
-                                                        {myDecision === "OVERRIDE" && justifs[alert.id]?.trim().length > 0 &&
-                                                         justifs[alert.id].trim().length < 10 && (
-                                                            <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
-                                                                <Info size={9} /> Précisez le contexte clinique (bénéfice/risque, adaptation posologique…)
                                                             </p>
                                                         )}
                                                     </div>
                                                 )}
 
-                                                {/* ── Feedback validation sémantique (post-soumission) ── */}
+                                                {/* Feedback validation sémantique */}
                                                 {alert.justification_valid && (
-                                                    <div className={`mt-3 px-3 py-2 rounded-lg border text-xs flex items-start gap-2
+                                                    <div className={`mt-3 px-3 py-2 rounded-xl border text-xs flex items-start gap-2
                                                         ${alert.justification_valid === "valid"
-                                                            ? "bg-emerald-950/40 border-emerald-500/25 text-emerald-300"
-                                                            : "bg-red-950/40 border-red-500/25 text-red-300"}`}>
+                                                            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                                            : "bg-red-50 border-red-200 text-red-700"}`}>
                                                         {alert.justification_valid === "valid"
                                                             ? <CheckCircle2 size={11} className="shrink-0 mt-0.5" />
                                                             : <AlertTriangle size={11} className="shrink-0 mt-0.5" />}
@@ -401,49 +350,42 @@ export default function CdsResultPanel({ result, onClose, onNewPrescription }) {
                     )}
                 </div>
 
-                {/* ── Footer ───────────────────────────────────────────── */}
-                <div className="px-6 py-4 border-t border-slate-700/40 bg-slate-900/20">
-
+                {/* ── Footer ───────────────────────────────────────── */}
+                <div className="px-6 py-4 border-t border-slate-100 bg-white">
                     {submitError && (
-                        <div className="mb-3 px-3 py-2 rounded-lg bg-red-950/40 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
+                        <div className="mb-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">
                             <AlertCircle size={12} /> {submitError}
                         </div>
                     )}
 
                     {isSafe ? (
-                        /* Prescription safe → pas d'audit nécessaire */
                         <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={onNewPrescription}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-300 border border-slate-600/50 hover:border-slate-500/70 transition-all">
+                            <button onClick={onNewPrescription}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all">
                                 <Plus size={14} /> Nouvelle prescription
                             </button>
-                            <button
-                                onClick={onClose}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all">
+                            <button onClick={onClose}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-md shadow-blue-200">
                                 <FileText size={14} /> Fermer
                             </button>
                         </div>
                     ) : (
-                        /* Alertes → confirmer les décisions */
                         <div className="flex items-center justify-between gap-4">
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-400">
                                 {!allDecided
-                                    ? `Décidez de chaque alerte avant de confirmer`
+                                    ? "Décidez de chaque alerte avant de confirmer"
                                     : overridesMissingJustif.length > 0
                                         ? `Justification manquante pour ${overridesMissingJustif.length} override${overridesMissingJustif.length > 1 ? "s" : ""}`
                                         : `Prêt à enregistrer ${alerts.length} décision${alerts.length > 1 ? "s" : ""}`}
                             </p>
                             <div className="flex gap-2 shrink-0">
-                                <button
-                                    onClick={onNewPrescription}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 border border-slate-700/50 hover:text-slate-300 transition-all">
+                                <button onClick={onNewPrescription}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all">
                                     <Plus size={13} /> Nouvelle
                                 </button>
-                                <button
-                                    onClick={confirmDecisions}
+                                <button onClick={confirmDecisions}
                                     disabled={!canConfirm || submitting}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-blue-200">
                                     {submitting
                                         ? <><Spinner size={13} /> Enregistrement…</>
                                         : <><Send size={13} /> Confirmer les décisions</>}

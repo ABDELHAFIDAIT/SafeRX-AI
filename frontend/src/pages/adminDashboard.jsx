@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     ShieldCheck, Users, LayoutDashboard, ClipboardList,
     LogOut, Plus, Search, CheckCircle2, AlertCircle,
     XCircle, Eye, EyeOff, ArrowRight, Activity, Stethoscope,
     ChevronDown, Bell, UserCheck, UserX, Pill, TrendingUp,
     Clock, Filter, MoreVertical, Mail, Lock, RefreshCw,
-    AlertTriangle, BarChart3, Shield, Siren
+    AlertTriangle, BarChart3, Shield, Siren, Trash2, KeyRound,
+    Download, ChevronLeft, ChevronRight as ChevronRightIcon,
+    RotateCcw, Info, X
 } from "lucide-react";
 import authService from "../services/AuthService";
 import api from "../api/api";
@@ -35,14 +37,15 @@ const formatDateTime = (iso) => {
     };
 };
 
-// TOP_ERRORS reste statique (nécessiterait un endpoint dédié)
-const TOP_ERRORS = [
-    { drug: "Warfarine",    count: 24, type: "Interaction" },
-    { drug: "Métformine",   count: 18, type: "Posologie rénale" },
-    { drug: "Digoxine",     count: 11, type: "Contre-indication" },
-    { drug: "Amoxicilline", count:  9, type: "Redondance DCI" },
-    { drug: "Clopidogrel",  count:  7, type: "Interaction AVK" },
-];
+// topAlerts est maintenant dynamique (vient de GET /account/stats)
+const ALERT_TYPE_LABELS = {
+    INTERACTION:       "Interaction",
+    ALLERGY:           "Allergie",
+    CONTRA_INDICATION: "Contre-indication",
+    REDUNDANT_DCI:     "Redondance DCI",
+    POSOLOGY:          "Posologie",
+    RENAL:             "Insuffisance rénale",
+};
 
 /* ─────────────────────────────────────────────────────────
    HELPERS
@@ -105,42 +108,48 @@ const KpiCard = ({ icon, label, value, sub, accent, trend }) => (
 /* ─────────────────────────────────────────────────────────
    VIEW — OVERVIEW
 ───────────────────────────────────────────────────────── */
-const OverviewView = ({ stats }) => (
+const OverviewView = ({ stats, topAlerts = [] }) => (
     <div className="flex flex-col gap-6">
         {/* KPI Grid */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard icon={<Users size={18} className="text-blue-600" />}        label="Utilisateurs actifs"   value={stats.totalUsers}            accent="bg-blue-50"    trend={8}   />
-            <KpiCard icon={<Pill size={18} className="text-indigo-600" />}        label="Prescriptions / 24h"   value={stats.prescriptionsToday}    accent="bg-indigo-50"  trend={3}   />
-            <KpiCard icon={<Siren size={18} className="text-amber-600" />}        label="Alertes déclenchées"   value={stats.alertsToday}           accent="bg-amber-50"   trend={-5}  />
-            <KpiCard icon={<ShieldCheck size={18} className="text-emerald-600" />}label="Taux de conformité"   value={`${stats.complianceRate}%`}  accent="bg-emerald-50" trend={1.2} />
+            <KpiCard icon={<Users size={18} className="text-blue-600" />}        label="Utilisateurs actifs"   value={stats.totalUsers}            accent="bg-blue-50"    />
+            <KpiCard icon={<Pill size={18} className="text-indigo-600" />}        label="Prescriptions / 24h"   value={stats.prescriptionsToday}    accent="bg-indigo-50"  />
+            <KpiCard icon={<Siren size={18} className="text-amber-600" />}        label="Décisions auditées"    value={stats.alertsToday}           accent="bg-amber-50"   />
+            <KpiCard icon={<ShieldCheck size={18} className="text-emerald-600" />}label="Taux de conformité"   value={`${stats.complianceRate}%`}  accent="bg-emerald-50" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            {/* Top erreurs */}
+            {/* Top alertes dynamiques */}
             <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100 p-5">
                 <div className="flex items-center gap-2 mb-4">
                     <BarChart3 size={16} className="text-slate-400" />
-                    <h3 className="font-semibold text-slate-700 text-sm">Top 5 — Alertes les plus fréquentes</h3>
+                    <h3 className="font-semibold text-slate-700 text-sm">Top 5 — Types d'alertes les plus fréquents</h3>
                 </div>
+                {topAlerts.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-4">Aucune donnée d'audit disponible.</p>
+                ) : (
                 <div className="flex flex-col gap-2.5">
-                    {TOP_ERRORS.map((item, i) => (
-                        <div key={item.drug} className="flex items-center gap-3">
+                    {topAlerts.map((item, i) => (
+                        <div key={item.type} className="flex items-center gap-3">
                             <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
                             <div className="flex-1">
                                 <div className="flex justify-between text-xs mb-1">
-                                    <span className="font-semibold text-slate-700">{item.drug}</span>
-                                    <span className="text-slate-400">{item.type} · <strong className="text-slate-600">{item.count}</strong></span>
+                                    <span className="font-semibold text-slate-700">
+                                        {ALERT_TYPE_LABELS[item.type] || item.type}
+                                    </span>
+                                    <strong className="text-slate-600">{item.count}</strong>
                                 </div>
                                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full rounded-full bg-blue-500 transition-all duration-700"
-                                        style={{ width: `${(item.count / TOP_ERRORS[0].count) * 100}%` }}
+                                        style={{ width: `${(item.count / topAlerts[0].count) * 100}%` }}
                                     />
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
+                )}
             </div>
 
             {/* Système */}
@@ -183,6 +192,8 @@ const OverviewView = ({ stats }) => (
 /* ─────────────────────────────────────────────────────────
    VIEW — USERS
 ───────────────────────────────────────────────────────── */
+const USERS_PER_PAGE = 8;
+
 const UsersView = () => {
     const [users, setUsers]               = useState([]);
     const [search, setSearch]             = useState("");
@@ -193,22 +204,24 @@ const UsersView = () => {
     const [formSuccess, setFormSuccess]   = useState("");
     const [isLoading, setIsLoading]       = useState(false);
     const [loadingUsers, setLoadingUsers] = useState(true);
+    const [page, setPage]                 = useState(1);
+    const [actionLoading, setActionLoading] = useState({}); // {userId: "toggle"|"delete"|"reset"}
+    const [selectedUser, setSelectedUser]   = useState(null); // modal détail
+    const [confirmDelete, setConfirmDelete] = useState(null); // userId à confirmer
 
-    // ✅ Charger les vrais utilisateurs depuis l'API
-    useEffect(() => {
-        const fetchUsers = async () => {
-            setLoadingUsers(true);
-            try {
-                const res = await api.get("/account/users");
-                setUsers(res.data || []);
-            } catch {
-                setUsers([]);
-            } finally {
-                setLoadingUsers(false);
-            }
-        };
-        fetchUsers();
+    const fetchUsers = useCallback(async () => {
+        setLoadingUsers(true);
+        try {
+            const res = await api.get("/account/users");
+            setUsers(res.data || []);
+        } catch {
+            setUsers([]);
+        } finally {
+            setLoadingUsers(false);
+        }
     }, []);
+
+    useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
     const filtered = users.filter(u => {
         const matchSearch = `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(search.toLowerCase());
@@ -216,12 +229,18 @@ const UsersView = () => {
         return matchSearch && matchRole;
     });
 
+    const totalPages  = Math.max(1, Math.ceil(filtered.length / USERS_PER_PAGE));
+    const paginated   = filtered.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
+
+    // Reset page when filter changes
+    useEffect(() => { setPage(1); }, [search, roleFilter]);
+
+    // ── Créer un compte ─────────────────────────────────────────────────
     const handleCreate = async (e) => {
         e.preventDefault();
         setFormError(""); setFormSuccess("");
         setIsLoading(true);
         try {
-            // ✅ Vrai appel API
             const res = await api.post("/account/create", formData);
             setUsers(prev => [res.data, ...prev]);
             setFormSuccess(`Compte créé. Un email a été envoyé à ${formData.email}.`);
@@ -234,12 +253,121 @@ const UsersView = () => {
         }
     };
 
-    // ✅ toggleActive sans appel API dédié pour l'instant (UI optimiste)
-    const toggleActive = (id) =>
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: !u.is_active } : u));
+    // ── Activer / Désactiver ─────────────────────────────────────────────
+    const toggleActive = async (id) => {
+        setActionLoading(p => ({ ...p, [id]: "toggle" }));
+        try {
+            const res = await api.patch(`/account/users/${id}/toggle`);
+            setUsers(prev => prev.map(u => u.id === id ? res.data : u));
+        } catch (err) {
+            alert(err.response?.data?.detail || "Erreur lors de la mise à jour.");
+        } finally {
+            setActionLoading(p => { const n = { ...p }; delete n[id]; return n; });
+        }
+    };
+
+    // ── Supprimer ────────────────────────────────────────────────────────
+    const deleteUser = async (id) => {
+        setConfirmDelete(null);
+        setActionLoading(p => ({ ...p, [id]: "delete" }));
+        try {
+            await api.delete(`/account/users/${id}`);
+            setUsers(prev => prev.filter(u => u.id !== id));
+        } catch (err) {
+            alert(err.response?.data?.detail || "Erreur lors de la suppression.");
+        } finally {
+            setActionLoading(p => { const n = { ...p }; delete n[id]; return n; });
+        }
+    };
+
+    // ── Réinitialiser MDP ────────────────────────────────────────────────
+    const resetPassword = async (id, email) => {
+        if (!window.confirm(`Réinitialiser le mot de passe de ${email} et envoyer un email ?`)) return;
+        setActionLoading(p => ({ ...p, [id]: "reset" }));
+        try {
+            await api.post(`/account/users/${id}/reset-password`);
+            setUsers(prev => prev.map(u => u.id === id ? { ...u, is_first_login: true } : u));
+            alert(`Nouveau mot de passe envoyé à ${email}.`);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Erreur lors de la réinitialisation.");
+        } finally {
+            setActionLoading(p => { const n = { ...p }; delete n[id]; return n; });
+        }
+    };
 
     return (
         <div className="flex flex-col gap-5">
+
+            {/* Modale confirmation suppression */}
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                <Trash2 size={18} className="text-red-600" />
+                            </div>
+                            <div>
+                                <p className="font-semibold text-slate-800">Supprimer le compte</p>
+                                <p className="text-xs text-slate-500">Cette action est irréversible.</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-5">
+                            Êtes-vous sûr de vouloir supprimer le compte de <strong>{confirmDelete.name}</strong> ?
+                        </p>
+                        <div className="flex gap-2">
+                            <button onClick={() => setConfirmDelete(null)}
+                                    className="flex-1 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-all">
+                                Annuler
+                            </button>
+                            <button onClick={() => deleteUser(confirmDelete.id)}
+                                    className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all">
+                                Supprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modale détail utilisateur */}
+            {selectedUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="font-semibold text-slate-800">Détail du compte</h3>
+                            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-600">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-950 flex items-center justify-center text-white font-bold">
+                                    {selectedUser.first_name[0]}{selectedUser.last_name[0]}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-slate-800">{selectedUser.first_name} {selectedUser.last_name}</p>
+                                    <p className="text-xs text-slate-500">{selectedUser.email}</p>
+                                </div>
+                            </div>
+                            {[
+                                ["Rôle",             roleLabel[selectedUser.role] || selectedUser.role],
+                                ["Statut",           selectedUser.is_active ? "Actif" : "Inactif"],
+                                ["Première connexion",selectedUser.is_first_login ? "En attente" : "Complétée"],
+                                ["Créé le",          formatDate(selectedUser.created_at)],
+                            ].map(([k, v]) => (
+                                <div key={k} className="flex justify-between text-sm border-b border-slate-100 pb-2">
+                                    <span className="text-slate-500">{k}</span>
+                                    <span className="font-medium text-slate-700">{v}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={() => setSelectedUser(null)}
+                                className="mt-5 w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 transition-all">
+                            Fermer
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Header actions */}
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                 <div className="flex gap-2 flex-wrap">
@@ -396,6 +524,9 @@ const UsersView = () => {
                     <h3 className="font-semibold text-slate-700 text-sm">
                         {loadingUsers ? "Chargement…" : `${filtered.length} utilisateur${filtered.length > 1 ? "s" : ""}`}
                     </h3>
+                    <button onClick={fetchUsers} className="text-slate-400 hover:text-slate-600 transition-colors" title="Rafraîchir">
+                        <RefreshCw size={14} />
+                    </button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -407,18 +538,20 @@ const UsersView = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {filtered.map(user => (
+                            {paginated.map(user => {
+                                const loading = actionLoading[user.id];
+                                return (
                                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
+                                        <button onClick={() => setSelectedUser(user)} className="flex items-center gap-3 text-left group">
                                             <div className="w-8 h-8 rounded-xl bg-blue-950 flex items-center justify-center text-white text-xs font-bold shrink-0">
                                                 {user.first_name[0]}{user.last_name[0]}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-slate-800 text-sm">{user.first_name} {user.last_name}</p>
+                                                <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{user.first_name} {user.last_name}</p>
                                                 <p className="text-xs text-slate-400">{user.email}</p>
                                             </div>
-                                        </div>
+                                        </button>
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleColor[user.role]}`}>
@@ -439,25 +572,66 @@ const UsersView = () => {
                                     </td>
                                     <td className="px-4 py-3 text-xs text-slate-400">{formatDate(user.created_at)}</td>
                                     <td className="px-4 py-3">
-                                        <button
-                                            onClick={() => toggleActive(user.id)}
-                                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
-                                                user.is_active
-                                                    ? "border-red-200 text-red-500 hover:bg-red-50"
-                                                    : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                                            }`}
-                                        >
-                                            {user.is_active ? "Désactiver" : "Activer"}
-                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Toggle actif/inactif */}
+                                            <button
+                                                onClick={() => toggleActive(user.id)}
+                                                disabled={!!loading}
+                                                title={user.is_active ? "Désactiver" : "Activer"}
+                                                className={`p-1.5 rounded-lg border transition-all disabled:opacity-40 ${
+                                                    user.is_active
+                                                        ? "border-red-200 text-red-500 hover:bg-red-50"
+                                                        : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                                }`}>
+                                                {loading === "toggle"
+                                                    ? <Spinner />
+                                                    : user.is_active ? <UserX size={13} /> : <UserCheck size={13} />}
+                                            </button>
+                                            {/* Réinitialiser MDP */}
+                                            <button
+                                                onClick={() => resetPassword(user.id, user.email)}
+                                                disabled={!!loading}
+                                                title="Réinitialiser le mot de passe"
+                                                className="p-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-40">
+                                                {loading === "reset" ? <Spinner /> : <KeyRound size={13} />}
+                                            </button>
+                                            {/* Supprimer */}
+                                            <button
+                                                onClick={() => setConfirmDelete({ id: user.id, name: `${user.first_name} ${user.last_name}` })}
+                                                disabled={!!loading}
+                                                title="Supprimer le compte"
+                                                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all disabled:opacity-40">
+                                                {loading === "delete" ? <Spinner /> : <Trash2 size={13} />}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                     {filtered.length === 0 && (
                         <div className="py-12 text-center text-slate-400 text-sm">Aucun utilisateur trouvé.</div>
                     )}
                 </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                        <p className="text-xs text-slate-400">
+                            Page {page}/{totalPages} · {filtered.length} utilisateurs
+                        </p>
+                        <div className="flex gap-1">
+                            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
+                                <ChevronLeft size={14} />
+                            </button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
+                                <ChevronRightIcon size={14} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -471,21 +645,42 @@ const AuditView = () => {
     const [logs, setLogs]       = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ✅ Charger le vrai journal d'audit
-    useEffect(() => {
-        const fetchAudit = async () => {
-            setLoading(true);
-            try {
-                const res = await api.get("/audit/recent?limit=100");
-                setLogs(res.data || []);
-            } catch {
-                setLogs([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAudit();
+    const fetchAudit = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await api.get("/audit/recent?limit=200");
+            setLogs(res.data || []);
+        } catch {
+            setLogs([]);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => { fetchAudit(); }, [fetchAudit]);
+
+    // Export CSV
+    const exportCSV = () => {
+        const headers = ["ID","Date","Décision","Type alerte","Sévérité","Titre alerte","Justification","Validation sémantique"];
+        const rows = logs.map(e => [
+            e.id,
+            e.created_at ? new Date(e.created_at).toLocaleString("fr-FR") : "",
+            e.decision,
+            e.alert_type    || "",
+            e.alert_severity || "",
+            `"${(e.alert_title    || "").replace(/"/g,'""')}"`,
+            `"${(e.justification  || "").replace(/"/g,'""')}"`,
+            e.justification_valid || "",
+        ].join(","));
+        const csv  = [headers.join(","), ...rows].join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = `audit_saferx_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     // Adapter le format API → format UI
     const mapped = logs.map(entry => ({
@@ -508,26 +703,38 @@ const AuditView = () => {
 
     return (
         <div className="flex flex-col gap-5">
-            <div className="flex items-center gap-2 flex-wrap">
-                {[
-                    { val: "all",              label: "Tout" },
-                    { val: "ALERT_ACCEPTED",   label: "✅ Acceptée" },
-                    { val: "OVERRIDE",         label: "⚠️ Override" },
-                    { val: "ALERT_IGNORED",    label: "❌ Ignorée" },
-                    { val: "PRESCRIPTION_OK",  label: "🛡️ OK" },
-                ].map(({ val, label }) => (
-                    <button
-                        key={val}
-                        onClick={() => setFilter(val)}
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-                            filter === val
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
-                        }`}
-                    >
-                        {label}
+            <div className="flex items-center gap-2 flex-wrap justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {[
+                        { val: "all",              label: "Tout" },
+                        { val: "ALERT_ACCEPTED",   label: "✅ Acceptée" },
+                        { val: "OVERRIDE",         label: "⚠️ Override" },
+                        { val: "ALERT_IGNORED",    label: "❌ Ignorée" },
+                        { val: "PRESCRIPTION_OK",  label: "🛡️ OK" },
+                    ].map(({ val, label }) => (
+                        <button
+                            key={val}
+                            onClick={() => setFilter(val)}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ${
+                                filter === val
+                                    ? "bg-blue-600 border-blue-600 text-white"
+                                    : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={fetchAudit} title="Rafraîchir"
+                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:border-blue-300 bg-white transition-all">
+                        <RefreshCw size={12} /> Rafraîchir
                     </button>
-                ))}
+                    <button onClick={exportCSV} title="Exporter CSV"
+                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white transition-all">
+                        <Download size={12} /> Export CSV
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -602,42 +809,32 @@ const AuditView = () => {
    ROOT DASHBOARD
 ───────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
-    const [activeNav, setActiveNav] = useState("overview");
-    const [stats,     setStats]     = useState(null);
+    const [activeNav,  setActiveNav]  = useState("overview");
+    const [stats,      setStats]      = useState(null);
+    const [topAlerts,  setTopAlerts]  = useState([]);
     const [auditCount, setAuditCount] = useState(0);
     const currentUser = authService.getUser();
 
-    // ✅ Charger les stats réelles au montage
+    // ✅ Stats réelles depuis GET /account/stats
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const [usersRes, auditRes] = await Promise.all([
-                    api.get("/account/users"),
-                    api.get("/audit/recent?limit=200"),
-                ]);
-
-                const users     = usersRes.data  || [];
-                const auditLogs = auditRes.data   || [];
-
-                const activeDoctors      = users.filter(u => u.role === "doctor"      && u.is_active).length;
-                const activePharmacists  = users.filter(u => u.role === "pharmacist"  && u.is_active).length;
-                const overrides          = auditLogs.filter(l => l.decision === "OVERRIDE").length;
-                const accepted           = auditLogs.filter(l => l.decision === "ACCEPTED").length;
-                const total              = auditLogs.length;
-                const overrideRate       = total > 0 ? +((overrides / total) * 100).toFixed(1) : 0;
-                const complianceRate     = total > 0 ? +((accepted  / total) * 100).toFixed(1) : 100;
-
+                const res = await api.get("/account/stats");
+                const d   = res.data;
                 setStats({
-                    totalUsers:        users.length,
-                    activeDoctors,
-                    activePharmacists,
-                    prescriptionsToday: "—",   // nécessiterait un endpoint dédié
-                    alertsToday:        total,
-                    overrideRate,
-                    complianceRate,
-                    avgResponseMs:      187,    // placeholder
+                    totalUsers:        d.total_users,
+                    activeDoctors:     d.active_doctors,
+                    activePharmacists: d.active_pharmacists,
+                    prescriptionsToday: d.prescriptions_today,
+                    alertsToday:       d.total_audit_entries,
+                    overrideRate:      d.override_rate,
+                    complianceRate:    d.compliance_rate,
+                    avgResponseMs:     187,   // nécessiterait un middleware de mesure
                 });
-                setAuditCount(auditLogs.filter(l => l.decision === "OVERRIDE").length);
+                setTopAlerts(d.top_alerts || []);
+                setAuditCount(
+                    Math.round((d.override_rate / 100) * d.total_audit_entries)
+                );
             } catch {
                 setStats(null);
             }
@@ -649,7 +846,7 @@ const AdminDashboard = () => {
 
     const views = {
         overview: stats
-            ? <OverviewView stats={stats} />
+            ? <OverviewView stats={stats} topAlerts={topAlerts} />
             : <div className="flex justify-center py-20"><Spinner /></div>,
         users:    <UsersView />,
         audit:    <AuditView />,

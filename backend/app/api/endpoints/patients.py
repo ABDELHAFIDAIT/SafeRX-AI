@@ -1,11 +1,5 @@
-"""
-SafeRx AI — Endpoints /patients
-Gestion des dossiers patients (données fictives Synthea uniquement).
-
-⚠️  ORDRE DES ROUTES IMPORTANT (FastAPI évalue dans l'ordre de déclaration) :
-    GET /search   doit être défini AVANT GET /{patient_id}
-    sinon "search" est interprété comme un patient_id entier → 422
-"""
+# /patients : gestion des dossiers patients (données Synthea)
+# IMPORTANT : GET /search doit être défini AVANT GET /{patient_id} pour éviter un conflit de route
 
 from __future__ import annotations
 import uuid as _uuid
@@ -67,12 +61,7 @@ def search_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Recherche flexible :
-    - Si q est un entier → cherche par Patient.id exact
-    - Si q ressemble à un UUID → cherche par fhir_patient_id
-    - Sinon → retourne liste vide (RGPD : pas de recherche par nom)
-    """
+    # Recherche flexible : entier → ID numérique, UUID → FHIR ID, autre → liste vide (RGPD)
     # Essai : ID numérique
     try:
         patient_id = int(q.strip())

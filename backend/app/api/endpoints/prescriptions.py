@@ -1,6 +1,4 @@
-"""
-SafeRx AI — Endpoints /prescriptions
-"""
+# /prescriptions : création + analyse CDS instantanée, lecture et listage des prescriptions
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -38,11 +36,7 @@ def create_prescription_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Accessible aux médecins et pharmaciens.
-    Crée la prescription, analyse chaque ligne de médicament et retourne
-    les alertes détectées (interactions, allergies, contre-indications…).
-    """
+    # Accessible aux médecins et pharmaciens — analyse CDS + alertes retournées immédiatement
     if current_user.role not in (Role.DOCTOR, Role.PHARMACIST):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

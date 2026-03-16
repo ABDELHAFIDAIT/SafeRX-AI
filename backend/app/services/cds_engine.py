@@ -1,15 +1,5 @@
-"""
-SafeRx AI — Moteur de règles CDS (Clinical Decision Support)
-─────────────────────────────────────────────────────────────
-Règles implémentées :
-
-  1. ALLERGY           — DCI prescrite ∈ allergies connues du patient
-  2. REDUNDANT_DCI     — deux lignes partagent la même molécule active
-  3. POSOLOGY          — âge du patient < âge minimal du médicament
-  4. CONTRA_INDICATION — grossesse / allaitement dans les contraindications
-  5. PSYCHOACTIVE      — substance psychoactive (MINOR, informatif)
-  6. INTERACTION       — paire DCI×DCI trouvée dans drug_interactions (Thésaurus ANSM)
-"""
+# Moteur de règles CDS — analyse chaque ligne de prescription et génère des alertes cliniques
+# Règles : ALLERGY, REDUNDANT_DCI, POSOLOGY, CONTRA_INDICATION, PSYCHOACTIVE, INTERACTION, RENAL
 from __future__ import annotations
 
 import re
@@ -39,24 +29,13 @@ def _age_years(birthdate: date) -> int:
 
 
 def _normalize_dci(dci: str) -> str:
-    """Lowercase + strip — comparaison interne."""
+    # Normalise en minuscules pour la comparaison interne
     return dci.strip().lower()
 
 
 def _normalize_for_ansm(dci: str) -> str:
-    """
-    Normalise une DCI pour matcher le Thésaurus ANSM.
-
-    Le Thésaurus stocke en MAJUSCULES avec accents (ex: "MÉTOPROLOL").
-    medicament.ma stocke en casse mixte (ex: "Métoprolol" ou "METOPROLOL").
-    On passe en MAJUSCULES + on supprime les accents des deux côtés
-    pour être robuste aux variantes d'encodage.
-
-    Exemples :
-      "métoprolol"           → "METOPROLOL"
-      "BÉSILATE D'AMLODIPINE" → "BESILATE D'AMLODIPINE"
-      "Acide acétylsalicylique" → "ACIDE ACETYLSALICYLIQUE"
-    """
+    # Normalise en MAJUSCULES sans accents pour matcher le format du Thésaurus ANSM
+    # ex: "métoprolol" → "METOPROLOL", robuste aux variantes d'encodage
     nfd = unicodedata.normalize("NFD", dci.strip().upper())
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn")
 
@@ -104,17 +83,7 @@ def _check_interactions(
     primary_dcis: dict[int, List[str]],
     drugs_by_id: dict[int, Drug],
 ) -> List[CdsAlert]:
-    """
-    Détecte les interactions DCI×DCI en une seule requête SQL.
-
-    Stratégie :
-      1. Normaliser toutes les DCI de la prescription (ANSM format)
-      2. SELECT * FROM drug_interactions
-         WHERE UPPER(dci_a) IN (...) AND UPPER(dci_b) IN (...)
-         → une seule requête quelle que soit la taille de la prescription
-      3. Pour chaque interaction retournée, retrouver les lignes impliquées
-         et créer l'alerte sur la ligne "partenaire"
-    """
+    # Détecte toutes les interactions DCI×DCI en une seule requête SQL sur le Thésaurus ANSM
     alerts: List[CdsAlert] = []
 
     if len(lines) < 2:
@@ -208,10 +177,7 @@ def analyse_prescription(
     patient: Patient,
     lines: List[PrescriptionLine],
 ) -> List[CdsAlert]:
-    """
-    Analyse toutes les lignes d'une prescription.
-    Retourne la liste des CdsAlert à persister (sans commit).
-    """
+    # Analyse toutes les lignes et retourne les CdsAlert à persister (sans commit)
     alerts: List[CdsAlert] = []
     patient_age = _age_years(patient.birthdate) if patient.birthdate else None
 

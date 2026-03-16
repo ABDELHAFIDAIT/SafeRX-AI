@@ -1,20 +1,11 @@
-"""
-SafeRx AI — Service RAG (Retrieval-Augmented Generation)
-══════════════════════════════════════════════════════════
-Enrichit chaque alerte CDS avec une explication clinique générée par LLM.
-
-Stratégie de providers (ordre de priorité) :
-  1. Ollama (local, gratuit)  — LLM_PROVIDER=ollama dans .env
-  2. Gemini (Google AI)       — fallback automatique si Ollama indisponible
-
-Si les deux échouent → RAG désactivé silencieusement.
-Le CDSS continue de fonctionner normalement sans enrichissement IA.
-"""
+# Service RAG : enrichit les alertes CDS avec des explications LLM
+# Providers supportés : Ollama (priorité) → Gemini (fallback) → désactivé silencieusement
 from __future__ import annotations
 
 import os
 import logging
 from typing import Optional
+from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +13,11 @@ logger = logging.getLogger(__name__)
 #  Configuration (depuis .env)
 # ─────────────────────────────────────────────────────────────────────────────
 
-LLM_PROVIDER    = os.getenv("LLM_PROVIDER",    "ollama")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL",    "llama3.1:8b")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY",  "")
-GEMINI_MODEL    = os.getenv("GEMINI_MODEL",    "gemini-flash-latest")
+LLM_PROVIDER    = settings.LLM_PROVIDER
+OLLAMA_MODEL    = settings.LLM_MODEL
+OLLAMA_BASE_URL = settings.OLLAMA_BASE_URL
+GEMINI_API_KEY  = settings.GEMINI_API_KEY
+GEMINI_MODEL    = settings.GEMINI_MODEL
 
 # RAG actif si Ollama configuré OU clé Gemini présente
 RAG_ENABLED = (LLM_PROVIDER == "ollama") or bool(GEMINI_API_KEY)
@@ -71,7 +62,7 @@ def _init_gemini():
 
 
 def _get_llm():
-    """Retourne le LLM actif. Ordre : Ollama → Gemini → None. Résultat mis en cache."""
+    # Retourne le LLM actif (mis en cache). Ordre : Ollama → Gemini → None
     global _llm, _active_provider
 
     if _llm is not None:
@@ -180,10 +171,7 @@ def generate_rag_explanation(
     alert_detail: str,
     context:      dict,
 ) -> Optional[str]:
-    """
-    Génère une explication clinique pour une alerte CDS.
-    Retourne None si le LLM est indisponible — ne lève jamais d'exception.
-    """
+    # Génère une explication LLM pour une alerte — retourne None si LLM indisponible, sans lever d'exception
     if not RAG_ENABLED:
         return None
 
@@ -276,10 +264,7 @@ def enrich_alerts_with_rag(
     drugs_ctx:        dict,
     patient_age:      int | None,
 ) -> None:
-    """
-    Enrichit in-place les alertes MAJOR et MODERATE avec rag_explanation.
-    Ne lève jamais d'exception.
-    """
+    # Enrichit in-place les alertes MAJOR/MODERATE avec rag_explanation — sans lever d'exception
     if not RAG_ENABLED:
         return
 
@@ -461,13 +446,7 @@ def validate_override_justification(
     alert_severity: str,
     alert_title:    str,
 ) -> dict:
-    """
-    Valide sémantiquement la justification d'un override via le LLM.
-
-    Retourne :
-        {"valid": bool, "feedback": str}
-        ou {"valid": None, "feedback": None} si LLM indisponible
-    """
+    # Valide sémantiquement via LLM — retourne {valid, feedback} ou {None, None} si LLM absent
     if not RAG_ENABLED or not justification or not justification.strip():
         return {"valid": None, "feedback": None}
 

@@ -1,11 +1,5 @@
-"""
-SafeRx AI — Endpoints /audit
-═════════════════════════════
-POST /audit              → Logger une décision sur une alerte
-POST /audit/bulk         → Logger toutes les décisions d'une prescription
-GET  /audit/prescription/{id} → Historique d'audit d'une prescription
-GET  /audit/recent       → Flux récent (admin)
-"""
+# /audit : POST unique → logger une décision | POST /bulk → décisions en lot
+# GET /prescription/{id} → historique | GET /recent → flux admin
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query

@@ -1,6 +1,16 @@
+"""
+SafeRx AI — Endpoints /audit
+═════════════════════════════
+POST /audit              → Logger une décision sur une alerte
+POST /audit/bulk         → Logger toutes les décisions d'une prescription
+GET  /audit/prescription/{id} → Historique d'audit d'une prescription
+GET  /audit/recent       → Flux récent (admin)
+"""
 from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+
 from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.audit_cds_hook import AuditCdsHook
 from backend.app.models.cds_alert import CdsAlert
@@ -11,30 +21,42 @@ from backend.app.services.ai_service import validate_override_justification
 router = APIRouter()
 
 
-@router.post("/", response_model=AuditOut, status_code=status.HTTP_201_CREATED, summary="Logger la décision du praticien sur une alerte CDS")
+# ─────────────────────────────────────────────────────────────────────────────
+#  POST /audit — Logger une décision unique
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/",
+    response_model=AuditOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Logger la décision du praticien sur une alerte CDS",
+)
 def create_audit_entry(
     payload: AuditCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Vérifie que l'alerte existe avant de créer l'entrée d'audit
+    # Vérifier que l'alerte existe
     alert = db.query(CdsAlert).filter(CdsAlert.id == payload.alert_id).first()
     if not alert:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Alerte {payload.alert_id} introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Alerte {payload.alert_id} introuvable.",
+        )
 
     entry = AuditCdsHook(
         alert_id        = payload.alert_id,
         prescription_id = payload.prescription_id,
         doctor_id       = current_user.id,
         decision        = payload.decision,
-        # Snapshot du contexte de l'alerte au moment de la décision
+        # Snapshot de l'alerte au moment de la décision
         alert_type      = alert.alert_type,
         alert_severity  = alert.severity,
         alert_title     = alert.title,
         justification   = payload.justification,
     )
 
-    # Validation sémantique LLM uniquement pour les overrides avec justification
+    # ── §3.3 Validation sémantique (OVERRIDE uniquement) ─────────────────
     if payload.decision == "OVERRIDE" and payload.justification:
         result = validate_override_justification(
             justification  = payload.justification,
@@ -42,8 +64,11 @@ def create_audit_entry(
             alert_severity = alert.severity   or "",
             alert_title    = alert.title      or "",
         )
-        # Mappe le booléen LLM vers les valeurs textuelles "valid" | "noise" | None
-        entry.justification_valid    = "valid" if result["valid"] is True else "noise" if result["valid"] is False else None
+        entry.justification_valid    = (
+            "valid" if result["valid"] is True
+            else "noise" if result["valid"] is False
+            else None
+        )
         entry.justification_feedback = result.get("feedback")
 
     db.add(entry)
@@ -52,18 +77,26 @@ def create_audit_entry(
     return entry
 
 
-@router.post("/bulk", response_model=list[AuditOut], status_code=status.HTTP_201_CREATED, summary="Logger toutes les décisions d'une prescription en une fois")
+# ─────────────────────────────────────────────────────────────────────────────
+#  POST /audit/bulk — Logger toutes les décisions d'une prescription
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/bulk",
+    response_model=list[AuditOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Logger toutes les décisions d'une prescription en une fois",
+)
 def create_bulk_audit(
     payload: AuditBulkCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Traite chaque décision individuellement — les alertes inconnues sont ignorées sans erreur
     entries = []
     for decision in payload.decisions:
         alert = db.query(CdsAlert).filter(CdsAlert.id == decision.alert_id).first()
         if not alert:
-            continue  # alerte supprimée ou id invalide — on continue sans bloquer
+            continue  # On skip les alertes inconnues sans bloquer
 
         entry = AuditCdsHook(
             alert_id        = decision.alert_id,
@@ -76,6 +109,7 @@ def create_bulk_audit(
             justification   = decision.justification,
         )
 
+        # ── §3.3 Validation sémantique (OVERRIDE uniquement) ─────────────
         if decision.decision == "OVERRIDE" and decision.justification:
             result = validate_override_justification(
                 justification  = decision.justification,
@@ -83,7 +117,11 @@ def create_bulk_audit(
                 alert_severity = alert.severity   or "",
                 alert_title    = alert.title      or "",
             )
-            entry.justification_valid    = "valid" if result["valid"] is True else "noise" if result["valid"] is False else None
+            entry.justification_valid    = (
+                "valid" if result["valid"] is True
+                else "noise" if result["valid"] is False
+                else None
+            )
             entry.justification_feedback = result.get("feedback")
 
         db.add(entry)
@@ -91,17 +129,24 @@ def create_bulk_audit(
 
     db.commit()
     for e in entries:
-        db.refresh(e)  # recharge chaque entrée pour remplir les champs auto-générés
+        db.refresh(e)
     return entries
 
 
-@router.get("/prescription/{prescription_id}", response_model=list[AuditOut], summary="Historique d'audit d'une prescription")
+# ─────────────────────────────────────────────────────────────────────────────
+#  GET /audit/prescription/{id} — Historique d'une prescription
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/prescription/{prescription_id}",
+    response_model=list[AuditOut],
+    summary="Historique d'audit d'une prescription",
+)
 def get_audit_for_prescription(
     prescription_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Retourne l'historique trié du plus récent au plus ancien
     return (
         db.query(AuditCdsHook)
         .filter(AuditCdsHook.prescription_id == prescription_id)
@@ -110,15 +155,25 @@ def get_audit_for_prescription(
     )
 
 
-@router.get("/recent", response_model=list[AuditOut], summary="Flux d'audit récent — admin uniquement")
+# ─────────────────────────────────────────────────────────────────────────────
+#  GET /audit/recent — Flux récent (admin uniquement)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/recent",
+    response_model=list[AuditOut],
+    summary="Flux d'audit récent — admin uniquement",
+)
 def get_recent_audit(
-    limit: int = Query(default=50, le=200),  # max 200 entrées par requête
+    limit: int = Query(default=50, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Réservé aux administrateurs — donne une vue globale sur les décisions récentes
     if current_user.role != Role.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès réservé aux administrateurs.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé aux administrateurs.",
+        )
     return (
         db.query(AuditCdsHook)
         .order_by(AuditCdsHook.created_at.desc())

@@ -1,35 +1,50 @@
+"""
+SafeRx AI — Service RAG (Retrieval-Augmented Generation)
+══════════════════════════════════════════════════════════
+Enrichit chaque alerte CDS avec une explication clinique générée par LLM.
+
+Stratégie de providers (ordre de priorité) :
+  1. Ollama (local, gratuit)  — LLM_PROVIDER=ollama dans .env
+  2. Gemini (Google AI)       — fallback automatique si Ollama indisponible
+
+Si les deux échouent → RAG désactivé silencieusement.
+Le CDSS continue de fonctionner normalement sans enrichissement IA.
+"""
 from __future__ import annotations
 
 import os
 import logging
-import json
-import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Lecture des variables LLM depuis l'environnement
+# ─────────────────────────────────────────────────────────────────────────────
+#  Configuration (depuis .env)
+# ─────────────────────────────────────────────────────────────────────────────
+
 LLM_PROVIDER    = os.getenv("LLM_PROVIDER",    "ollama")
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL",    "llama3.1:8b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY",  "")
 GEMINI_MODEL    = os.getenv("GEMINI_MODEL",    "gemini-flash-latest")
 
-# RAG actif si Ollama est le provider configuré ou si une clé Gemini est fournie
+# RAG actif si Ollama configuré OU clé Gemini présente
 RAG_ENABLED = (LLM_PROVIDER == "ollama") or bool(GEMINI_API_KEY)
 
-# Cache global du LLM initialisé et du provider actif
+# ─────────────────────────────────────────────────────────────────────────────
+#  Initialisation LLM — lazy + fallback automatique
+# ─────────────────────────────────────────────────────────────────────────────
+
 _llm             = None
 _active_provider = None   # "ollama" | "gemini" | None
 
 
 def _init_ollama():
-    # Initialise Ollama et fait un ping de connectivité avant de valider
     try:
         from langchain_ollama import ChatOllama
         from langchain_core.messages import HumanMessage
         llm = ChatOllama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0.1)
-        llm.invoke([HumanMessage(content="ping")])  # test réel de disponibilité
+        llm.invoke([HumanMessage(content="ping")])   # test de connectivité
         logger.info(f"[RAG] Ollama actif : {OLLAMA_MODEL} @ {OLLAMA_BASE_URL}")
         return llm
     except Exception as e:
@@ -38,7 +53,6 @@ def _init_ollama():
 
 
 def _init_gemini():
-    # Retourne None immédiatement si aucune clé API n'est configurée
     if not GEMINI_API_KEY:
         return None
     try:
@@ -47,7 +61,7 @@ def _init_gemini():
             model             = GEMINI_MODEL,
             google_api_key    = GEMINI_API_KEY,
             temperature       = 0.1,
-            max_output_tokens = 350,  # limite la longueur des réponses
+            max_output_tokens = 350,
         )
         logger.info(f"[RAG] Gemini actif : {GEMINI_MODEL} (fallback)")
         return llm
@@ -57,7 +71,7 @@ def _init_gemini():
 
 
 def _get_llm():
-    # Retourne le LLM en cache ou tente de l'initialiser (Ollama → Gemini → None)
+    """Retourne le LLM actif. Ordre : Ollama → Gemini → None. Résultat mis en cache."""
     global _llm, _active_provider
 
     if _llm is not None:
@@ -65,13 +79,13 @@ def _get_llm():
     if not RAG_ENABLED:
         return None
 
-    # Priorité 1 : Ollama local
+    # Priorité 1 : Ollama
     _llm = _init_ollama()
     if _llm:
         _active_provider = "ollama"
         return _llm
 
-    # Priorité 2 : Gemini comme fallback automatique
+    # Priorité 2 : Gemini (fallback)
     logger.info("[RAG] Ollama indisponible → tentative Gemini")
     _llm = _init_gemini()
     if _llm:
@@ -82,7 +96,10 @@ def _get_llm():
     return None
 
 
-# Prompts spécialisés par type d'alerte — en français médical clinique
+# ─────────────────────────────────────────────────────────────────────────────
+#  Prompts par type d'alerte
+# ─────────────────────────────────────────────────────────────────────────────
+
 PROMPT_INTERACTION = """\
 Tu es un pharmacologue clinique expert. Explique en 3 phrases maximum, \
 en français médical clair et concis, pourquoi l'association de {dci_a} \
@@ -119,17 +136,54 @@ Réponds uniquement avec l'explication."""
 
 PROMPT_REDUNDANT = """\
 Tu es un pharmacologue clinique. En 2 phrases maximum en français médical, \
-explique le risque de la double prescription de {dci} (présente dans {drug_list}).
-Mentionne le risque de surdosage et l'effet pharmacologique cumulatif. \
+explique le risque spécifique de la double prescription de {dci} \
+(présente dans {drug_list}).
+
+Mentionne le risque de surdosage propre à cette molécule \
+(ex: paracétamol → cytotoxicité hépatique via NAPQI ; \
+metformine → acidose lactique ; \
+ibuprofène → toxicité gastro-intestinale et rénale). \
+Ne mentionne jamais d'hypoglycémie pour un médicament non hypoglycémiant. \
 Réponds uniquement avec l'explication."""
 
+PROMPT_RENAL = """\
+Contexte clinique : patient en insuffisance rénale chronique, \
+clairance créatinine = {crcl} mL/min (seuil de sécurité pour ce médicament : {threshold} mL/min).
+Molécule concernée : {dci} (spécialité : {drug_name}).
+
+En tant que pharmacologue clinique, rédigez en 2-3 phrases en français médical \
+une explication pédagogique précisant :
+1. Le mécanisme par lequel cette molécule s'accumule en cas d'insuffisance rénale
+2. La conséquence clinique principale de cette accumulation
+
+Répondez uniquement avec l'explication, sans titre ni bullet points."""
+
+PROMPT_ALLERGY_CROSS = """\
+Contexte clinique d'enseignement en pharmacologie : \
+un patient présente dans son dossier une allergie aux {allergen_family}.
+Le prescripteur envisage {drug_name} dont la DCI est {dci}.
+
+En 2 phrases en français médical, expliquez :
+- Pourquoi cette molécule peut déclencher une réaction chez ce patient
+- Le mécanisme immunologique impliqué (IgE-médié, hapténique, etc.)
+- Le type de réaction le plus probable
+
+Répondez uniquement avec l'explication pharmacologique, \
+sans recommandation de ne pas prescrire."""
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Génération d'une explication
+# ─────────────────────────────────────────────────────────────────────────────
 
 def generate_rag_explanation(
     alert_type:   str,
     alert_detail: str,
     context:      dict,
 ) -> Optional[str]:
-    # Génère une explication LLM pour une alerte ; retourne None si LLM absent
+    """
+    Génère une explication clinique pour une alerte CDS.
+    Retourne None si le LLM est indisponible — ne lève jamais d'exception.
+    """
     if not RAG_ENABLED:
         return None
 
@@ -146,7 +200,7 @@ def generate_rag_explanation(
         response    = llm.invoke([HumanMessage(content=prompt)])
         explanation = response.content.strip()
 
-        # Filtre les réponses trop courtes ou anormalement longues
+        # Sanity check — réponse cohérente
         if len(explanation) < 20 or len(explanation) > 800:
             return None
 
@@ -154,7 +208,7 @@ def generate_rag_explanation(
 
     except Exception as e:
         global _llm, _active_provider
-        # Si Ollama tombe en cours d'exécution, réinitialise vers Gemini au prochain appel
+        # Si Ollama tombe en cours d'exécution → reset pour que Gemini prenne le relais
         if _active_provider == "ollama":
             logger.warning(f"[RAG] Ollama erreur runtime : {e} — reset vers Gemini au prochain appel")
             _llm, _active_provider = None, None
@@ -164,7 +218,6 @@ def generate_rag_explanation(
 
 
 def _build_prompt(alert_type: str, alert_detail: str, ctx: dict) -> Optional[str]:
-    # Sélectionne et formate le prompt selon le type d'alerte
     if alert_type == "INTERACTION":
         return PROMPT_INTERACTION.format(
             dci_a          = ctx.get("dci_a",          "molécule A"),
@@ -174,6 +227,13 @@ def _build_prompt(alert_type: str, alert_detail: str, ctx: dict) -> Optional[str
             recommendation = ctx.get("recommendation") or "Surveiller le patient.",
         )
     if alert_type == "ALLERGY":
+        # Distinguer allergie directe vs allergie croisée (famille)
+        if ctx.get("is_cross_allergy"):
+            return PROMPT_ALLERGY_CROSS.format(
+                allergen_family = ctx.get("allergen_family", "cette famille"),
+                drug_name       = ctx.get("drug_name",       "ce médicament"),
+                dci             = ctx.get("dci",             "DCI inconnue"),
+            )
         return PROMPT_ALLERGY.format(
             allergen  = ctx.get("allergen",  "la molécule"),
             drug_name = ctx.get("drug_name", "ce médicament"),
@@ -196,8 +256,19 @@ def _build_prompt(alert_type: str, alert_detail: str, ctx: dict) -> Optional[str
             dci       = ctx.get("dci",       "cette molécule"),
             drug_list = ctx.get("drug_list", "plusieurs médicaments"),
         )
+    if alert_type == "RENAL":
+        return PROMPT_RENAL.format(
+            drug_name = ctx.get("drug_name", "ce médicament"),
+            dci       = ctx.get("dci",       "DCI inconnue"),
+            crcl      = ctx.get("crcl",      "?"),
+            threshold = ctx.get("threshold", "?"),
+        )
     return None
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Enrichissement batch — appelé par prescription_service
+# ─────────────────────────────────────────────────────────────────────────────
 
 def enrich_alerts_with_rag(
     alerts:           list,
@@ -205,13 +276,16 @@ def enrich_alerts_with_rag(
     drugs_ctx:        dict,
     patient_age:      int | None,
 ) -> None:
-    # Enrichit in-place uniquement les alertes MAJOR et MODERATE avec une explication LLM
+    """
+    Enrichit in-place les alertes MAJOR et MODERATE avec rag_explanation.
+    Ne lève jamais d'exception.
+    """
     if not RAG_ENABLED:
         return
 
     for alert in alerts:
         if alert.severity not in ("MAJOR", "MODERATE"):
-            continue  # les alertes MINOR ne sont pas enrichies
+            continue
         ctx = _extract_context(alert, interactions_ctx, drugs_ctx, patient_age)
         explanation = generate_rag_explanation(
             alert_type   = alert.alert_type,
@@ -219,18 +293,17 @@ def enrich_alerts_with_rag(
             context      = ctx,
         )
         if explanation:
-            alert.rag_explanation = explanation  # stocké directement sur l'objet ORM
+            alert.rag_explanation = explanation
 
 
 def _extract_context(alert, interactions_ctx: dict, drugs_ctx: dict, patient_age) -> dict:
-    # Construit le dict de contexte à injecter dans le prompt selon le type d'alerte
     ctx = {}
+    title  = alert.title  or ""
+    detail = alert.detail or ""
 
     if alert.alert_type == "INTERACTION":
-        # Cherche la paire DCI dans le contexte d'interactions déjà chargé
         for (dci_a, dci_b), inter in interactions_ctx.items():
-            if dci_a.upper() in (alert.title or "").upper() or \
-               dci_b.upper() in (alert.title or "").upper():
+            if dci_a.upper() in title.upper() or dci_b.upper() in title.upper():
                 ctx = {
                     "dci_a":          inter.dci_a,
                     "dci_b":          inter.dci_b,
@@ -239,57 +312,105 @@ def _extract_context(alert, interactions_ctx: dict, drugs_ctx: dict, patient_age
                     "recommendation": inter.recommendation,
                 }
                 break
-        if not ctx and "—" in (alert.title or ""):
-            # Fallback : parse le titre si l'interaction n'est pas dans le contexte
-            parts = alert.title.split("—")[-1].strip().split("/")
+        if not ctx and "—" in title:
+            parts = title.split("—")[-1].strip().split("/")
             ctx = {
                 "dci_a":          parts[0].strip() if len(parts) > 0 else "molécule A",
                 "dci_b":          parts[1].strip() if len(parts) > 1 else "molécule B",
                 "level_fr":       "interaction",
                 "mechanism":      "",
-                "recommendation": alert.detail or "",
+                "recommendation": detail,
             }
 
     elif alert.alert_type == "ALLERGY":
-        detail = alert.detail or ""
-        ctx = {
-            "allergen":  detail.split("allergie documentée à :")[1].split(".")[0].strip()
-                         if "allergie documentée à :" in detail else "l'allergène",
-            "drug_name": alert.title.split("—")[-1].strip() if "—" in (alert.title or "") else "ce médicament",
-            "dci":       alert.title.split("—")[-1].strip() if "—" in (alert.title or "") else "",
-        }
+        drug_name = title.split("—")[-1].strip() if "—" in title else "ce médicament"
+
+        # Cas 1 : allergie directe (format "Allergie connue — DCI")
+        if "allergie documentée à :" in detail:
+            ctx = {
+                "is_cross_allergy": False,
+                "allergen":  detail.split("allergie documentée à :")[1].split(".")[0].strip(),
+                "drug_name": drug_name,
+                "dci":       drug_name,
+            }
+        # Cas 2 : allergie croisée par famille (format "Allergie croisée — DRUG")
+        # "Le patient est allergique aux Pénicilline. Le médicament..."
+        elif "allergique aux" in detail or "allergique à" in detail:
+            # Extraire la famille depuis le détail
+            import re as _re
+            match = _re.search(r"allergique aux? ([^.]+)\.", detail)
+            allergen_family = match.group(1).strip() if match else "cette famille"
+            # Extraire la DCI depuis "(DCI : ...)"
+            dci_match = _re.search(r"\(DCI\s*:\s*([^)]+)\)", detail)
+            dci = dci_match.group(1).strip() if dci_match else drug_name
+            ctx = {
+                "is_cross_allergy": True,
+                "allergen_family":  allergen_family,
+                "drug_name":        drug_name,
+                "dci":              dci,
+            }
+        # Fallback
+        else:
+            ctx = {
+                "is_cross_allergy": False,
+                "allergen":  "l'allergène",
+                "drug_name": drug_name,
+                "dci":       drug_name,
+            }
 
     elif alert.alert_type == "CONTRA_INDICATION":
         ctx = {
-            "drug_name": alert.title.split("—")[-1].strip() if "—" in (alert.title or "") else "ce médicament",
+            "drug_name": title.split("—")[-1].strip() if "—" in title else "ce médicament",
             "dci":       "",
-            # Déduit le contexte clinique depuis le titre de l'alerte
-            "context":   "femme enceinte" if "grossesse" in (alert.title or "").lower()
+            "context":   "femme enceinte" if "grossesse" in title.lower()
                          else "patiente allaitante",
         }
 
     elif alert.alert_type == "POSOLOGY":
-        detail = alert.detail or ""
         ctx = {
-            "drug_name":   alert.title.split("—")[-1].strip() if "—" in (alert.title or "") else "ce médicament",
+            "drug_name":   title.split("—")[-1].strip() if "—" in title else "ce médicament",
             "patient_age": patient_age or "inconnu",
-            # Extrait l'âge minimal depuis le détail textuel de l'alerte
             "min_age":     detail.split("à partir de")[1].split(".")[0].strip()
                            if "à partir de" in detail else "un certain âge",
         }
 
     elif alert.alert_type == "REDUNDANT_DCI":
-        detail = alert.detail or ""
         ctx = {
-            "dci":       alert.title.split("—")[-1].strip() if "—" in (alert.title or "") else "cette molécule",
+            "dci":       title.split("—")[-1].strip() if "—" in title else "cette molécule",
             "drug_list": detail.split(":")[1].strip() if ":" in detail else "plusieurs médicaments",
+        }
+
+    elif alert.alert_type == "RENAL":
+        import re as _re
+        crcl_match      = _re.search(r"Clairance du patient\s*:\s*([\d.]+)", detail)
+        threshold_match = _re.search(r"<\s*([\d.]+)\s*mL/min", detail)
+        drug_name = title.split("—")[-1].strip() if "—" in title else "ce médicament"
+
+        # Extraire la DCI depuis le détail pour éviter les hallucinations
+        # Le détail contient le message de risque qui inclut souvent la molécule
+        # Ex: "contre-indication (risque d'acidose lactique)" → metformine
+        # On cherche aussi dans drugs_ctx si disponible
+        dci_from_ctx = None
+        for drug_id, drug in drugs_ctx.items():
+            if drug.brand_name and drug.brand_name in drug_name:
+                dci_from_ctx = drug.dci
+                break
+
+        ctx = {
+            "drug_name": drug_name,
+            "dci":       dci_from_ctx or drug_name,  # DCI réelle ou fallback marque
+            "crcl":      crcl_match.group(1)      if crcl_match      else "?",
+            "threshold": threshold_match.group(1) if threshold_match else "?",
         }
 
     return ctx
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Utilitaire statut IA (exposé dans GET /health)
+# ─────────────────────────────────────────────────────────────────────────────
+
 def get_ai_status() -> dict:
-    # Retourne l'état courant du module RAG — utilisé par GET /ai/status
     return {
         "rag_enabled":         RAG_ENABLED,
         "configured_provider": LLM_PROVIDER,
@@ -300,7 +421,10 @@ def get_ai_status() -> dict:
     }
 
 
-# Prompt de validation sémantique d'un override — retourne un JSON {valid, feedback}
+# ─────────────────────────────────────────────────────────────────────────────
+#  §3.3 — Validation sémantique des overrides
+# ─────────────────────────────────────────────────────────────────────────────
+
 PROMPT_OVERRIDE_VALIDATION = """\
 Tu es un médecin expert en pharmacovigilance chargé de valider les justifications \
 cliniques d'override dans un système CDSS.
@@ -337,7 +461,13 @@ def validate_override_justification(
     alert_severity: str,
     alert_title:    str,
 ) -> dict:
-    # Valide sémantiquement la justification d'un override via le LLM
+    """
+    Valide sémantiquement la justification d'un override via le LLM.
+
+    Retourne :
+        {"valid": bool, "feedback": str}
+        ou {"valid": None, "feedback": None} si LLM indisponible
+    """
     if not RAG_ENABLED or not justification or not justification.strip():
         return {"valid": None, "feedback": None}
 
@@ -364,14 +494,16 @@ def validate_override_justification(
         response = llm.invoke([HumanMessage(content=prompt)])
         raw      = response.content.strip()
 
-        # Extrait le bloc JSON même si le LLM a ajouté du texte avant/après
+        # Parser le JSON retourné par le LLM
+        import json, re
+        # Extraire le bloc JSON si le LLM a ajouté du texte autour
         json_match = re.search(r'\{.*\}', raw, re.DOTALL)
         if not json_match:
             raise ValueError(f"Réponse non parseable : {raw[:100]}")
 
         parsed   = json.loads(json_match.group())
         is_valid = bool(parsed.get("valid", False))
-        feedback = str(parsed.get("feedback", ""))[:200]  # limite le feedback à 200 chars
+        feedback = str(parsed.get("feedback", ""))[:200]
 
         logger.info(
             f"[§3.3] Override validation — valid={is_valid} | "

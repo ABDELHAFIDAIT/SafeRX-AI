@@ -24,3 +24,4 @@ langchain-chroma
 langchain-experimental
 langchain-unstructured
 pytest
+prometheus-client

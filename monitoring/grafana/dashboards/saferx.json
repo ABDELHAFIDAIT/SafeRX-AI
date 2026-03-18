@@ -1,0 +1,722 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "SafeRx AI — Monitoring CDS, RAG, LR et décisions médecin",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "id": 1,
+      "title": "Prescriptions totales",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_prescriptions_total)",
+          "legendFormat": "Total",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "stat",
+      "id": 2,
+      "title": "Alertes CDS générées",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_cds_alerts_total)",
+          "legendFormat": "Total",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "stat",
+      "id": 3,
+      "title": "Alertes MAJOR",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_cds_alerts_total{severity=\"MAJOR\"})",
+          "legendFormat": "MAJOR",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "stat",
+      "id": 4,
+      "title": "Taux d'override (%)",
+      "description": "% de décisions OVERRIDE parmi toutes les décisions",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 40
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(saferx_audit_decisions_total{decision=\"OVERRIDE\"}) / sum(saferx_audit_decisions_total)",
+          "legendFormat": "Override %",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "stat",
+      "id": 6,
+      "title": "Alertes enrichies RAG",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_rag_enriched_total)",
+          "legendFormat": "RAG",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 10,
+      "title": "Alertes CDS par type (taux par minute)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"INTERACTION\"}[5m]) * 60",
+          "legendFormat": "INTERACTION",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"ALLERGY\"}[5m]) * 60",
+          "legendFormat": "ALLERGY",
+          "refId": "B",
+          "datasource": null
+        },
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"REDUNDANT_DCI\"}[5m]) * 60",
+          "legendFormat": "REDUNDANT_DCI",
+          "refId": "C",
+          "datasource": null
+        },
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"RENAL\"}[5m]) * 60",
+          "legendFormat": "RENAL",
+          "refId": "D",
+          "datasource": null
+        },
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"CONTRA_INDICATION\"}[5m]) * 60",
+          "legendFormat": "CONTRA_INDICATION",
+          "refId": "E",
+          "datasource": null
+        },
+        {
+          "expr": "rate(saferx_cds_alerts_total{alert_type=\"POSOLOGY\"}[5m]) * 60",
+          "legendFormat": "POSOLOGY",
+          "refId": "F",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "piechart",
+      "id": 11,
+      "title": "Décisions médecin",
+      "description": "Répartition ACCEPTED / IGNORED / OVERRIDE sur toute la période",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "pieType": "donut"
+      },
+      "fieldConfig": {
+        "defaults": {}
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_audit_decisions_total{decision=\"ACCEPTED\"})",
+          "legendFormat": "ACCEPTED",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "sum(saferx_audit_decisions_total{decision=\"IGNORED\"})",
+          "legendFormat": "IGNORED",
+          "refId": "B",
+          "datasource": null
+        },
+        {
+          "expr": "sum(saferx_audit_decisions_total{decision=\"OVERRIDE\"})",
+          "legendFormat": "OVERRIDE",
+          "refId": "C",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "piechart",
+      "id": 12,
+      "title": "Prescriptions safe vs avec alertes",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "expr": "sum(saferx_prescriptions_total{status=\"safe\"})",
+          "legendFormat": "Safe (0 alerte)",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "sum(saferx_prescriptions_total{status=\"alerts\"})",
+          "legendFormat": "Avec alertes",
+          "refId": "B",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 20,
+      "title": "Latence API — p50 / p95 / p99 (ms)",
+      "description": "Percentiles de latence des endpoints FastAPI",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=~\"/api/.*\"}[5m])) * 1000",
+          "legendFormat": "p50",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=~\"/api/.*\"}[5m])) * 1000",
+          "legendFormat": "p95",
+          "refId": "B",
+          "datasource": null
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=~\"/api/.*\"}[5m])) * 1000",
+          "legendFormat": "p99",
+          "refId": "C",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 21,
+      "title": "Requêtes HTTP par endpoint (req/min)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{handler=\"/api/prescriptions/\"}[5m]) * 60",
+          "legendFormat": "POST /prescriptions",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "rate(http_requests_total{handler=\"/api/audit/bulk\"}[5m]) * 60",
+          "legendFormat": "POST /audit/bulk",
+          "refId": "B",
+          "datasource": null
+        },
+        {
+          "expr": "rate(http_requests_total{handler=\"/api/patients/{patient_id}\"}[5m]) * 60",
+          "legendFormat": "GET /patients",
+          "refId": "C",
+          "datasource": null
+        },
+        {
+          "expr": "rate(http_requests_total{handler=\"/api/auth/login\"}[5m]) * 60",
+          "legendFormat": "POST /auth/login",
+          "refId": "D",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 31,
+      "title": "Erreurs HTTP 4xx / 5xx",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"4..\"}[5m]) * 60",
+          "legendFormat": "4xx",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) * 60",
+          "legendFormat": "5xx",
+          "refId": "B",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 40,
+      "title": "CPU par container (%)",
+      "description": "Utilisation CPU de chaque container SafeRx (moyenne sur 1 min)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"saferxai_.*\"}[1m])) * 100",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 41,
+      "title": "Mémoire par container (Mo)",
+      "description": "Consommation mémoire RSS de chaque container",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "container_memory_rss{name=~\"saferxai_.*\"} / 1024 / 1024",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "timeseries",
+      "id": 42,
+      "title": "Réseau — trafic entrant/sortant (Ko/s)",
+      "description": "Trafic réseau par container",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "KBs",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total{name=~\"saferxai_.*\"}[1m]) / 1024",
+          "legendFormat": "↓ {{name}}",
+          "refId": "A",
+          "datasource": null
+        },
+        {
+          "expr": "rate(container_network_transmit_bytes_total{name=~\"saferxai_.*\"}[1m]) / 1024",
+          "legendFormat": "↑ {{name}}",
+          "refId": "B",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    },
+    {
+      "type": "stat",
+      "id": 43,
+      "title": "Containers actifs",
+      "description": "Nombre de containers saferxai en cours d'exécution",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 8
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "count(container_last_seen{name=~\"saferxai_.*\"})",
+          "legendFormat": "Containers",
+          "refId": "A",
+          "datasource": null
+        }
+      ],
+      "datasource": null
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "saferx",
+    "cds",
+    "monitoring"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SafeRx AI — Monitoring",
+  "uid": "saferx-monitoring",
+  "version": 1
+}

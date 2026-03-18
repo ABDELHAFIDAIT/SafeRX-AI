@@ -1,0 +1,15 @@
+# monitoring/grafana/provisioning/dashboards/dashboard.yml
+#
+# Indique à Grafana où charger les dashboards JSON au démarrage.
+
+apiVersion: 1
+
+providers:
+  - name: saferx
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30       # recharge automatiquement si le JSON change
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards   # dossier monté via docker-compose

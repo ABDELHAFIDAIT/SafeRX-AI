@@ -313,7 +313,9 @@ class TestAccesAdmin(unittest.TestCase):
         admin = make_user()
         admin.role = Role.ADMIN
         db = make_db_session()
-        db.query.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        db.query.return_value.order_by.return_value.limit.return_value.all.return_value = (
+            []
+        )
 
         resultat = _audit_recent(limit=50, db=db, current_user=admin)
         self.assertIsInstance(resultat, list)

@@ -62,9 +62,7 @@ def create_audit_entry(
         entry.justification_valid = (
             "valid"
             if result["valid"] is True
-            else "noise"
-            if result["valid"] is False
-            else None
+            else "noise" if result["valid"] is False else None
         )
         entry.justification_feedback = result.get("feedback")
 
@@ -118,9 +116,7 @@ def create_bulk_audit(
             entry.justification_valid = (
                 "valid"
                 if result["valid"] is True
-                else "noise"
-                if result["valid"] is False
-                else None
+                else "noise" if result["valid"] is False else None
             )
             entry.justification_feedback = result.get("feedback")
 

@@ -716,9 +716,7 @@ def analyse_prescription(
                             else (
                                 "modérée (stade 3)"
                                 if crcl < 45
-                                else "légère (stade 2)"
-                                if crcl < 60
-                                else "débutante"
+                                else "légère (stade 2)" if crcl < 60 else "débutante"
                             )
                         )
                         alerts.append(

@@ -25,3 +25,4 @@ langchain-experimental
 langchain-unstructured
 pytest
 prometheus-client
+prometheus_fastapi_instrumentator 

@@ -1,5 +1,5 @@
-# /patients : gestion des dossiers patients (données Synthea)
-# IMPORTANT : GET /search doit être défini AVANT GET /{patient_id} pour éviter un conflit de route
+# /patients : gestion des dossiers patients
+# IMPORTANT : GET /search doit être défini AVANT GET /{patient_id}
 
 from __future__ import annotations
 import uuid as _uuid
@@ -10,19 +10,26 @@ from sqlalchemy.orm import Session
 from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.patient import Patient
 from backend.app.models.user import User, Role
-from backend.app.schemas.clinical_schemas import (
-    PatientCreate,
-    PatientOut,
-    PatientUpdate,
-)
+from backend.app.schemas.clinical_schemas import PatientCreate, PatientOut, PatientUpdate
 
 router = APIRouter()
+
+
+def _payload_to_dict(payload: PatientCreate) -> dict:
+    """
+    Convertit le payload Pydantic en dict compatible SQLAlchemy.
+    - fhir_patient_id : uuid.UUID → str  (la colonne SQLAlchemy est String)
+    - Les float et bool sont déjà natifs
+    """
+    data = payload.model_dump()
+    if data.get("fhir_patient_id") is not None:
+        data["fhir_patient_id"] = str(data["fhir_patient_id"])
+    return data
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  POST / — Créer un dossier patient
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 @router.post(
     "/",
@@ -38,7 +45,7 @@ def create_patient(
     if current_user.role not in (Role.DOCTOR, Role.PHARMACIST, Role.ADMIN):
         raise HTTPException(status_code=403, detail="Accès refusé.")
 
-    patient = Patient(**payload.model_dump())
+    patient = Patient(**_payload_to_dict(payload))
     db.add(patient)
     db.commit()
     db.refresh(patient)
@@ -48,7 +55,6 @@ def create_patient(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /search — AVANT /{patient_id} pour éviter le conflit de route
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 @router.get(
     "/search",
@@ -61,8 +67,7 @@ def search_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Recherche flexible : entier → ID numérique, UUID → FHIR ID, autre → liste vide (RGPD)
-    # Essai : ID numérique
+    # ID numérique
     try:
         patient_id = int(q.strip())
         p = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -70,10 +75,10 @@ def search_patients(
     except ValueError:
         pass
 
-    # Essai : FHIR UUID
+    # FHIR UUID — on compare en str car la colonne est String
     try:
-        fhir_id = _uuid.UUID(q.strip())
-        p = db.query(Patient).filter(Patient.fhir_patient_id == str(fhir_id)).first()
+        fhir_id = str(_uuid.UUID(q.strip()))
+        p = db.query(Patient).filter(Patient.fhir_patient_id == fhir_id).first()
         return [p] if p else []
     except ValueError:
         pass
@@ -84,7 +89,6 @@ def search_patients(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET / — Lister les patients
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 @router.get(
     "/",
@@ -101,9 +105,8 @@ def list_patients(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  GET /{patient_id} — ⚠️  APRÈS /search et / pour éviter les conflits
+#  GET /{patient_id} — APRÈS /search et /
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 @router.get(
     "/{patient_id}",
@@ -128,7 +131,6 @@ def get_patient(
 #  PATCH /{patient_id} — Mettre à jour un dossier patient
 # ─────────────────────────────────────────────────────────────────────────────
 
-
 @router.patch(
     "/{patient_id}",
     response_model=PatientOut,
@@ -147,8 +149,7 @@ def update_patient(
             detail=f"Patient {patient_id} introuvable.",
         )
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(patient, field, value)
 
     db.commit()

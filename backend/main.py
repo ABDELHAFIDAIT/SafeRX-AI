@@ -7,10 +7,8 @@ from backend.app.db.session import engine
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.app.db.init_db import init_db
-from backend.app.models import user, drug, patient, prescription, cds_alert
 from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Counter, Histogram
-
+from prometheus_client import Counter
 
 # Alertes CDS générées par le moteur de règles
 CDS_ALERTS_TOTAL = Counter(
@@ -18,21 +16,21 @@ CDS_ALERTS_TOTAL = Counter(
     "Nombre d'alertes CDS générées",
     ["alert_type", "severity"],
 )
- 
+
 # Alertes enrichies par le RAG (LLM a fourni une explication)
 RAG_ENRICHED_TOTAL = Counter(
     "saferx_rag_enriched_total",
     "Alertes enrichies par le LLM (RAG)",
     ["alert_type"],
 )
- 
+
 # Décisions des médecins face aux alertes
 AUDIT_DECISIONS_TOTAL = Counter(
     "saferx_audit_decisions_total",
     "Décisions médecin : ACCEPTED / IGNORED / OVERRIDE",
     ["decision", "alert_type", "severity"],
 )
- 
+
 # Prescriptions créées (safe = 0 alerte, alerts = au moins 1 alerte)
 PRESCRIPTIONS_TOTAL = Counter(
     "saferx_prescriptions_total",
@@ -40,7 +38,7 @@ PRESCRIPTIONS_TOTAL = Counter(
     ["status"],
 )
 
- 
+
 def record_cds_alerts(alerts: list) -> None:
     for alert in alerts:
         CDS_ALERTS_TOTAL.labels(
@@ -49,15 +47,13 @@ def record_cds_alerts(alerts: list) -> None:
         ).inc()
 
         if alert.rag_explanation:
-            RAG_ENRICHED_TOTAL.labels(
-                alert_type=alert.alert_type or "UNKNOWN"
-            ).inc()
- 
- 
+            RAG_ENRICHED_TOTAL.labels(alert_type=alert.alert_type or "UNKNOWN").inc()
+
+
 def record_prescription(status: str) -> None:
     PRESCRIPTIONS_TOTAL.labels(status=status).inc()
- 
- 
+
+
 def record_audit_decision(decision: str, alert_type: str, severity: str) -> None:
     AUDIT_DECISIONS_TOTAL.labels(
         decision=decision,
@@ -101,8 +97,8 @@ app.add_middleware(
 
 
 Instrumentator(
-    should_group_status_codes=False, 
-    should_ignore_untemplated=True,  
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
     excluded_handlers=["/metrics", "/"],
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
@@ -114,7 +110,7 @@ app.include_router(router, prefix=settings.API_STR)
 async def health():
     # Endpoint de santé — utilisé par les health checks Docker et les load balancers
     return {
-        "status":  "success",
+        "status": "success",
         "message": "Welcome to SafeRx AI API",
         "version": settings.VERSION,
     }

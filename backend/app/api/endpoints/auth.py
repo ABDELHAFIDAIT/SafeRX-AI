@@ -32,10 +32,10 @@ def login(
 
     # Inclut is_first_login pour rediriger le frontend vers le changement de MDP
     return {
-        "access_token":   access_token,
-        "token_type":     "bearer",
+        "access_token": access_token,
+        "token_type": "bearer",
         "is_first_login": user.is_first_login,
-        "role":           user.role.value,
-        "first_name":     user.first_name,
-        "last_name":      user.last_name,
+        "role": user.role.value,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
     }

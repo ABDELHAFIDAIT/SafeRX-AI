@@ -2,7 +2,6 @@ from __future__ import annotations
 import logging
 from datetime import date
 from sqlalchemy.orm import Session, selectinload
-from backend.app.models.cds_alert import CdsAlert
 from backend.app.models.drug import Drug, DciComponent
 from backend.app.models.drug_interaction import DrugInteraction
 from backend.app.models.patient import Patient
@@ -13,7 +12,6 @@ from backend.app.services.cds_engine import analyse_prescription, _normalize_for
 from backend.app.services.ai_service import enrich_alerts_with_rag, RAG_ENABLED
 from backend.app.services.lr_service import score_alerts
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,13 +19,16 @@ def _age_years(birthdate: date) -> int | None:
     if not birthdate:
         return None
     today = date.today()
-    return today.year - birthdate.year - (
-        (today.month, today.day) < (birthdate.month, birthdate.day)
+    return (
+        today.year
+        - birthdate.year
+        - ((today.month, today.day) < (birthdate.month, birthdate.day))
     )
 
 
-
-def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User ) -> Prescription:
+def create_prescription(
+    db: Session, payload: PrescriptionCreate, doctor: User
+) -> Prescription:
     # ── Vérifier que le patient existe ───────────────────────────────────────
     patient: Patient | None = db.query(Patient).get(payload.patient_id)
     if not patient:
@@ -44,11 +45,11 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
 
     # ── Créer l'en-tête ──────────────────────────────────────────────────────
     prescription = Prescription(
-        patient_id    = payload.patient_id,
-        doctor_id     = doctor.id,
-        fhir_bundle_id= payload.fhir_bundle_id,
-        hook_event    = payload.hook_event or "order-sign",
-        status        = "draft",
+        patient_id=payload.patient_id,
+        doctor_id=doctor.id,
+        fhir_bundle_id=payload.fhir_bundle_id,
+        hook_event=payload.hook_event or "order-sign",
+        status="draft",
     )
     db.add(prescription)
     db.flush()
@@ -57,14 +58,14 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     lines: list[PrescriptionLine] = []
     for line_data in payload.lines:
         line = PrescriptionLine(
-            prescription_id = prescription.id,
-            drug_id         = line_data.drug_id,
-            dci             = line_data.dci,
-            dose_mg         = line_data.dose_mg,
-            dose_unit_raw   = line_data.dose_unit_raw,
-            frequency       = line_data.frequency,
-            route           = line_data.route,
-            duration_days   = line_data.duration_days,
+            prescription_id=prescription.id,
+            drug_id=line_data.drug_id,
+            dci=line_data.dci,
+            dose_mg=line_data.dose_mg,
+            dose_unit_raw=line_data.dose_unit_raw,
+            frequency=line_data.frequency,
+            route=line_data.route,
+            duration_days=line_data.duration_days,
         )
         db.add(line)
         lines.append(line)
@@ -77,8 +78,8 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     # ── Enrichissement RAG (best-effort, ne bloque pas si LLM indisponible) ──
     if RAG_ENABLED and alerts:
         try:
-            drug_ids     = [l.drug_id for l in lines]
-            drugs_by_id  = {
+            drug_ids = [l.drug_id for l in lines]
+            drugs_by_id = {
                 d.id: d for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
             }
             all_dcis = set()
@@ -92,13 +93,17 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
                     all_dcis.add(_normalize_for_ansm(comp.dci))
 
             interactions_raw = (
-                db.query(DrugInteraction)
-                .filter(
-                    DrugInteraction.dci_a.in_(all_dcis) |
-                    DrugInteraction.dci_b.in_(all_dcis)
+                (
+                    db.query(DrugInteraction)
+                    .filter(
+                        DrugInteraction.dci_a.in_(all_dcis)
+                        | DrugInteraction.dci_b.in_(all_dcis)
+                    )
+                    .all()
                 )
-                .all()
-            ) if len(all_dcis) >= 2 else []
+                if len(all_dcis) >= 2
+                else []
+            )
 
             interactions_ctx = {
                 (_normalize_for_ansm(i.dci_a), _normalize_for_ansm(i.dci_b)): i
@@ -108,10 +113,10 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
             patient_age = _age_years(patient.birthdate)
 
             enrich_alerts_with_rag(
-                alerts            = alerts,
-                interactions_ctx  = interactions_ctx,
-                drugs_ctx         = drugs_by_id,
-                patient_age       = patient_age,
+                alerts=alerts,
+                interactions_ctx=interactions_ctx,
+                drugs_ctx=drugs_by_id,
+                patient_age=patient_age,
             )
             logger.info(
                 f"RAG enrichissement terminé — {sum(1 for a in alerts if a.rag_explanation)} "
@@ -125,7 +130,9 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
         score_alerts(alerts)
         scored = sum(1 for a in alerts if a.ai_ignore_proba is not None)
         if scored:
-            logger.info(f"[LR] Scoring terminé — {scored}/{len(alerts)} alertes scorées")
+            logger.info(
+                f"[LR] Scoring terminé — {scored}/{len(alerts)} alertes scorées"
+            )
     except Exception as e:
         logger.error(f"[LR] Scoring échoué (non bloquant) : {e}")
 
@@ -141,9 +148,7 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     db.refresh(prescription)
     prescription = (
         db.query(Prescription)
-        .options(
-            selectinload(Prescription.lines).selectinload(PrescriptionLine.alerts)
-        )
+        .options(selectinload(Prescription.lines).selectinload(PrescriptionLine.alerts))
         .filter(Prescription.id == prescription.id)
         .one()
     )
@@ -151,20 +156,18 @@ def create_prescription( db: Session, payload: PrescriptionCreate, doctor: User 
     return prescription
 
 
-
 def get_prescription(db: Session, prescription_id: int) -> Prescription | None:
     return (
         db.query(Prescription)
-        .options(
-            selectinload(Prescription.lines).selectinload(PrescriptionLine.alerts)
-        )
+        .options(selectinload(Prescription.lines).selectinload(PrescriptionLine.alerts))
         .filter(Prescription.id == prescription_id)
         .first()
     )
 
 
-
-def list_prescriptions_for_patient( db: Session, patient_id: int, skip: int  = 0, limit: int = 20 ) -> list[Prescription]:
+def list_prescriptions_for_patient(
+    db: Session, patient_id: int, skip: int = 0, limit: int = 20
+) -> list[Prescription]:
     return (
         db.query(Prescription)
         .filter(Prescription.patient_id == patient_id)

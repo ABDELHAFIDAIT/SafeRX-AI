@@ -7,7 +7,6 @@ from pathlib import Path
 import psycopg2
 from psycopg2.extras import execute_values
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Config
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,12 +30,13 @@ DCI_B_FIXES: dict[str, str] = {
 #  Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _db_conn():
     return psycopg2.connect(
-        host=os.getenv("POSTGRES_HOST",     "db"),
+        host=os.getenv("POSTGRES_HOST", "db"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        dbname=os.getenv("POSTGRES_DB",     "saferx"),
-        user=os.getenv("POSTGRES_USER",     "saferx"),
+        dbname=os.getenv("POSTGRES_DB", "saferx"),
+        user=os.getenv("POSTGRES_USER", "saferx"),
         password=os.getenv("POSTGRES_PASSWORD", ""),
     )
 
@@ -66,6 +66,7 @@ def _ensure_table(cur) -> None:
 #  Étape 1 — Lecture + corrections
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def load_csv(path: Path) -> list[dict]:
     rows = []
     with open(path, encoding="utf-8") as f:
@@ -81,6 +82,7 @@ def load_csv(path: Path) -> list[dict]:
 #  Étape 2 — Déduplication
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def deduplicate(rows: list[dict]) -> list[dict]:
     """
     Pour une même paire (dci_a, dci_b), on garde l'entrée au niveau
@@ -94,7 +96,7 @@ def deduplicate(rows: list[dict]) -> list[dict]:
         if existing is None:
             best[key] = row
         else:
-            r_rank = SEVERITY_RANK.get(row["severity"],      0)
+            r_rank = SEVERITY_RANK.get(row["severity"], 0)
             e_rank = SEVERITY_RANK.get(existing["severity"], 0)
             if r_rank > e_rank:
                 best[key] = row
@@ -105,13 +107,16 @@ def deduplicate(rows: list[dict]) -> list[dict]:
 
     deduped = list(best.values())
     removed = len(rows) - len(deduped)
-    print(f"  Après dédup     : {len(deduped):,} lignes  ({removed} doublons supprimés)")
+    print(
+        f"  Après dédup     : {len(deduped):,} lignes  ({removed} doublons supprimés)"
+    )
     return deduped
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Étape 3 — Symétrie
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def add_symmetric(rows: list[dict]) -> list[dict]:
     """
@@ -124,24 +129,29 @@ def add_symmetric(rows: list[dict]) -> list[dict]:
     for row in rows:
         inv_key = (row["dci_b"], row["dci_a"])
         if inv_key not in existing_pairs:
-            symmetric_rows.append({
-                "dci_a":          row["dci_b"],
-                "dci_b":          row["dci_a"],
-                "level_fr":       row["level_fr"],
-                "severity":       row["severity"],
-                "mechanism":      row["mechanism"],
-                "recommendation": row["recommendation"],
-            })
+            symmetric_rows.append(
+                {
+                    "dci_a": row["dci_b"],
+                    "dci_b": row["dci_a"],
+                    "level_fr": row["level_fr"],
+                    "severity": row["severity"],
+                    "mechanism": row["mechanism"],
+                    "recommendation": row["recommendation"],
+                }
+            )
             existing_pairs.add(inv_key)
 
     total = rows + symmetric_rows
-    print(f"  Après symétrie  : {len(total):,} lignes  (+{len(symmetric_rows)} paires inversées)")
+    print(
+        f"  Après symétrie  : {len(total):,} lignes  (+{len(symmetric_rows)} paires inversées)"
+    )
     return total
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Étape 4 — Insertion PostgreSQL
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def insert(rows: list[dict], dry_run: bool = False) -> int:
     tuples = [
@@ -150,7 +160,7 @@ def insert(rows: list[dict], dry_run: bool = False) -> int:
             r["dci_b"],
             r["level_fr"],
             r["severity"],
-            r["mechanism"]      or None,
+            r["mechanism"] or None,
             r["recommendation"] or None,
             SOURCE,
         )
@@ -158,7 +168,9 @@ def insert(rows: list[dict], dry_run: bool = False) -> int:
     ]
 
     if dry_run:
-        print(f"\n  [DRY-RUN] {len(tuples):,} lignes prêtes à insérer — aucune connexion DB.")
+        print(
+            f"\n  [DRY-RUN] {len(tuples):,} lignes prêtes à insérer — aucune connexion DB."
+        )
         print("  Exemples :")
         for t in tuples[:3]:
             print(f"    [{t[3]}] {t[0]}  +  {t[1]}")
@@ -187,7 +199,10 @@ def insert(rows: list[dict], dry_run: bool = False) -> int:
                     page_size=500,
                 )
                 # Récupérer le compte réel inséré / mis à jour
-                cur.execute("SELECT COUNT(*) FROM drug_interactions WHERE source = %s", (SOURCE,))
+                cur.execute(
+                    "SELECT COUNT(*) FROM drug_interactions WHERE source = %s",
+                    (SOURCE,),
+                )
                 count = cur.fetchone()[0]
 
         print(f"  Insertions OK   : {count:,} lignes dans drug_interactions")
@@ -200,6 +215,7 @@ def insert(rows: list[dict], dry_run: bool = False) -> int:
 # ─────────────────────────────────────────────────────────────────────────────
 #  Stats post-insertion
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def print_db_stats() -> None:
     conn = _db_conn()
@@ -235,19 +251,21 @@ def print_db_stats() -> None:
 #  Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Load interactions ANSM → drug_interactions")
-    ap.add_argument(
-        "--csv", default=str(CSV_PATH),
-        help=f"Chemin du CSV (défaut: {CSV_PATH})"
+    ap = argparse.ArgumentParser(
+        description="Load interactions ANSM → drug_interactions"
     )
     ap.add_argument(
-        "--dry-run", action="store_true",
-        help="Simuler sans écrire en base"
+        "--csv", default=str(CSV_PATH), help=f"Chemin du CSV (défaut: {CSV_PATH})"
     )
     ap.add_argument(
-        "--no-symmetric", action="store_true",
-        help="Ne pas ajouter les paires inversées"
+        "--dry-run", action="store_true", help="Simuler sans écrire en base"
+    )
+    ap.add_argument(
+        "--no-symmetric",
+        action="store_true",
+        help="Ne pas ajouter les paires inversées",
     )
     args = ap.parse_args()
 

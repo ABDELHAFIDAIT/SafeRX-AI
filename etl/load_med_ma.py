@@ -6,7 +6,6 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 
-
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -17,21 +16,21 @@ log = logging.getLogger(__name__)
 
 
 # ── Chemins ──────────────────────────────────────────────────────────────────
-_HERE     = Path(__file__).resolve().parent
-ROOT      = _HERE if (_HERE / "data").exists() else _HERE.parent
+_HERE = Path(__file__).resolve().parent
+ROOT = _HERE if (_HERE / "data").exists() else _HERE.parent
 
 DRUGS_CSV = ROOT / "data" / "processed" / "drugs_ma_clean" / "drugs_ma_clean.csv"
-DCI_CSV   = ROOT / "data" / "processed" / "dci_components" / "dci_components.csv"
+DCI_CSV = ROOT / "data" / "processed" / "dci_components" / "dci_components.csv"
 
 
 # ── Connexion PostgreSQL ──────────────────────────────────────────────────────
 def get_connection():
     return psycopg2.connect(
-        host     = os.getenv("POSTGRES_HOST",     "db"),
-        port     = int(os.getenv("POSTGRES_PORT", "5432")),
-        dbname   = os.getenv("POSTGRES_DB",       "saferx"),
-        user     = os.getenv("POSTGRES_USER",     "saferx"),
-        password = os.getenv("POSTGRES_PASSWORD", "saferx"),
+        host=os.getenv("POSTGRES_HOST", "db"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        dbname=os.getenv("POSTGRES_DB", "saferx"),
+        user=os.getenv("POSTGRES_USER", "saferx"),
+        password=os.getenv("POSTGRES_PASSWORD", "saferx"),
     )
 
 
@@ -127,7 +126,8 @@ def load_dci(conn, csv_path: Path, valid_drug_ids: set):
     rows = [
         (int(r["drug_id"]), str(r["dci"]).strip(), int(r["position"]))
         for _, r in df.iterrows()
-        if pd.notna(r["drug_id"]) and pd.notna(r["dci"])
+        if pd.notna(r["drug_id"])
+        and pd.notna(r["dci"])
         and int(r["drug_id"]) in valid_drug_ids
     ]
 

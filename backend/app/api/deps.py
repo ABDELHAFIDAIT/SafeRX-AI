@@ -20,7 +20,9 @@ def get_db():
         db.close()
 
 
-def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+def get_current_user(
+    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
+):
     # Décode le JWT et retourne l'utilisateur correspondant — lève 401 si invalide
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -29,7 +31,9 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     )
 
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
         email: str = payload.get("sub")  # "sub" contient l'email de l'utilisateur
         if email is None:
             raise credentials_exception
@@ -43,8 +47,12 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     return user
 
 
-def get_current_active_admin(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_current_active_admin(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     # Vérifie que l'utilisateur courant a le rôle ADMIN — utilisé comme dépendance de route
     if current_user.role != Role.ADMIN:
-        raise HTTPException(status_code=403, detail="Accès refusé : privilèges d'administrateur requis")
+        raise HTTPException(
+            status_code=403, detail="Accès refusé : privilèges d'administrateur requis"
+        )
     return current_user

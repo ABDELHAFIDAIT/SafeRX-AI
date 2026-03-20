@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import  Session
+from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.user import User, Role
@@ -25,6 +25,7 @@ router = APIRouter()
 #  Crée une prescription + analyse CDS instantanée
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/",
     response_model=CdsResponse,
@@ -44,9 +45,7 @@ def create_prescription_endpoint(
         )
 
     try:
-        prescription = create_prescription(
-            db=db, payload=payload, doctor=current_user
-        )
+        prescription = create_prescription(db=db, payload=payload, doctor=current_user)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -54,15 +53,11 @@ def create_prescription_endpoint(
         )
 
     # Aplatir toutes les alertes pour la réponse CDS
-    all_alerts = [
-        alert
-        for line in prescription.lines
-        for alert in line.alerts
-    ]
+    all_alerts = [alert for line in prescription.lines for alert in line.alerts]
 
     return CdsResponse(
         prescription_id=prescription.id,
-        status=prescription.status,           # "safe" | "alerts"
+        status=prescription.status,  # "safe" | "alerts"
         alert_count=len(all_alerts),
         alerts=all_alerts,
         prescription=prescription,
@@ -72,6 +67,7 @@ def create_prescription_endpoint(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /prescriptions/{id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/{prescription_id}",
@@ -90,11 +86,7 @@ def get_prescription_endpoint(
             detail=f"Prescription {prescription_id} introuvable.",
         )
 
-    all_alerts = [
-        alert
-        for line in prescription.lines
-        for alert in line.alerts
-    ]
+    all_alerts = [alert for line in prescription.lines for alert in line.alerts]
 
     return CdsResponse(
         prescription_id=prescription.id,
@@ -108,6 +100,7 @@ def get_prescription_endpoint(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /prescriptions/patient/{patient_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/patient/{patient_id}",
@@ -130,15 +123,16 @@ def list_patient_prescriptions(
 #  GET /prescriptions/doctor/mine — Prescriptions du médecin connecté
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/doctor/mine",
     response_model=list[PrescriptionOut],
     summary="Prescriptions créées par le médecin connecté (plus récentes en premier)",
 )
 def get_my_prescriptions(
-    skip:  int = Query(default=0),
+    skip: int = Query(default=0),
     limit: int = Query(default=30, le=100),
-    db:    Session = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     from backend.app.models.prescription import Prescription, PrescriptionLine

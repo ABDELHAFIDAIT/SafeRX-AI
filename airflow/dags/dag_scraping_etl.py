@@ -19,6 +19,7 @@ Automatise chaque dimanche à 02h00 la chaîne complète :
 Les scripts ETL sont montés depuis ./etl et ./scraping dans /app/etl et /app/scraping.
 Les données sont partagées via le volume ./data monté dans /app/data.
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,26 +37,27 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRAPING_DIR = "/app/scraping"
-ETL_DIR      = "/app/etl"
-DATA_RAW     = "/app/data/raw"
-DATA_PROC    = "/app/data/processed"
+ETL_DIR = "/app/etl"
+DATA_RAW = "/app/data/raw"
+DATA_PROC = "/app/data/processed"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Paramètres par défaut — s'appliquent à toutes les tâches du DAG
 # ─────────────────────────────────────────────────────────────────────────────
 
 default_args = {
-    "owner":            "saferx",
-    "depends_on_past":  False,
-    "retries":          2,                      # 2 tentatives en cas d'échec
-    "retry_delay":      timedelta(minutes=10),  # attente entre chaque tentative
+    "owner": "saferx",
+    "depends_on_past": False,
+    "retries": 2,  # 2 tentatives en cas d'échec
+    "retry_delay": timedelta(minutes=10),  # attente entre chaque tentative
     "email_on_failure": False,
-    "email_on_retry":   False,
+    "email_on_retry": False,
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Vérification de pré-condition : compter les nouvelles lignes scrappées
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def verifier_fichier_scrape(**context) -> None:
     """
@@ -76,7 +78,9 @@ def verifier_fichier_scrape(**context) -> None:
         rows = sum(1 for _ in reader)
 
     if rows < 2:  # header + au moins 1 ligne de données
-        raise ValueError(f"Fichier scraping vide ou header seul ({rows} lignes) : {csv_path}")
+        raise ValueError(
+            f"Fichier scraping vide ou header seul ({rows} lignes) : {csv_path}"
+        )
 
     logger.info(f"[DAG] Fichier scraping OK : {rows - 1} médicaments trouvés")
     context["ti"].xcom_push(key="nb_medicaments_scrapes", value=rows - 1)
@@ -87,16 +91,15 @@ def verifier_fichier_scrape(**context) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 with DAG(
-    dag_id      = "scraping_etl_pipeline",
-    description = "Scraping medicament.ma + ETL ANSM — hebdomadaire (dimanche 02h00)",
-    default_args= default_args,
-    schedule    = "0 2 * * 0",           # cron : dimanche à 02h00 UTC
-    start_date  = datetime(2025, 1, 1),
-    catchup     = False,                 # ne pas exécuter les runs passés au démarrage
-    max_active_runs = 1,                 # empêche deux runs simultanés
-    tags        = ["saferx", "etl", "scraping"],
+    dag_id="scraping_etl_pipeline",
+    description="Scraping medicament.ma + ETL ANSM — hebdomadaire (dimanche 02h00)",
+    default_args=default_args,
+    schedule="0 2 * * 0",  # cron : dimanche à 02h00 UTC
+    start_date=datetime(2025, 1, 1),
+    catchup=False,  # ne pas exécuter les runs passés au démarrage
+    max_active_runs=1,  # empêche deux runs simultanés
+    tags=["saferx", "etl", "scraping"],
 ) as dag:
-
     dag.doc_md = """
     ## scraping_etl_pipeline
 
@@ -114,26 +117,26 @@ with DAG(
 
     # ── Tâche 1 : Scraping medicament.ma ─────────────────────────────────────
     scrape = BashOperator(
-        task_id      = "scrape_medicaments",
-        bash_command = (
+        task_id="scrape_medicaments",
+        bash_command=(
             f"cd {SCRAPING_DIR} && "
             f"python scraper_med_ma.py --output {DATA_RAW}/all_drugs_med_ma.csv"
         ),
-        doc_md = "Scrape medicament.ma et sauvegarde le CSV brut dans data/raw/.",
+        doc_md="Scrape medicament.ma et sauvegarde le CSV brut dans data/raw/.",
     )
 
     # ── Tâche 2 : Vérification du fichier scrappé ────────────────────────────
     verifier = PythonOperator(
-        task_id         = "verifier_scrape",
-        python_callable = verifier_fichier_scrape,
-        doc_md          = "Vérifie que le CSV contient des données avant de continuer.",
+        task_id="verifier_scrape",
+        python_callable=verifier_fichier_scrape,
+        doc_md="Vérifie que le CSV contient des données avant de continuer.",
     )
 
     # ── Tâche 3 : Transformation ──────────────────────────────────────────────
     transform = BashOperator(
-        task_id      = "transform_data",
-        bash_command = f"cd {ETL_DIR} && python transform_med_ma.py",
-        doc_md       = (
+        task_id="transform_data",
+        bash_command=f"cd {ETL_DIR} && python transform_med_ma.py",
+        doc_md=(
             "Nettoie all_drugs_med_ma.csv → drugs_ma_clean.csv + dci_components.csv "
             "dans data/processed/."
         ),
@@ -141,16 +144,16 @@ with DAG(
 
     # ── Tâche 4 : Chargement médicaments en base ──────────────────────────────
     load_drugs = BashOperator(
-        task_id      = "load_drugs",
-        bash_command = f"cd {ETL_DIR} && python load_med_ma.py",
-        doc_md       = "Insère ou met à jour les tables drugs_ma et dci_components.",
+        task_id="load_drugs",
+        bash_command=f"cd {ETL_DIR} && python load_med_ma.py",
+        doc_md="Insère ou met à jour les tables drugs_ma et dci_components.",
     )
 
     # ── Tâche 5 : Chargement interactions ANSM ───────────────────────────────
     load_interactions = BashOperator(
-        task_id      = "load_interactions",
-        bash_command = f"cd {ETL_DIR} && python load_interactions.py",
-        doc_md       = (
+        task_id="load_interactions",
+        bash_command=f"cd {ETL_DIR} && python load_interactions.py",
+        doc_md=(
             "Charge drug_interactions depuis data/processed/interactions_ansm.csv. "
             "Ce fichier ne change pas — seuls les nouveaux médicaments peuvent créer "
             "de nouvelles interactions."

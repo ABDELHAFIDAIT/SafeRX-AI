@@ -6,32 +6,32 @@ from pathlib import Path
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
-    StructType, StructField,
-    StringType, FloatType, BooleanType, IntegerType
+    StringType,
+    FloatType,
+    BooleanType,
 )
-
 
 # ── Chemins ──────────────────────────────────────────────────────────────────
 # En Docker : script dans /app/ → parent = /app  (data/ est présent ici)
 # En local  : script dans etl/  → parent = etl/, on remonte d'un cran
 _HERE = Path(__file__).resolve().parent
-ROOT  = _HERE if (_HERE / 'data').exists() else _HERE.parent
-INPUT_CSV   = ROOT / "data" / "raw"  / "all_drugs_med_ma.csv"
-OUTPUT_DIR  = ROOT / "data" / "processed"
+ROOT = _HERE if (_HERE / "data").exists() else _HERE.parent
+INPUT_CSV = ROOT / "data" / "raw" / "all_drugs_med_ma.csv"
+OUTPUT_DIR = ROOT / "data" / "processed"
 
 OUTPUT_DRUGS = str(OUTPUT_DIR / "drugs_ma.parquet")
-OUTPUT_DCI   = str(OUTPUT_DIR / "dci_components.parquet")
+OUTPUT_DCI = str(OUTPUT_DIR / "dci_components.parquet")
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # 1. Session Spark
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def get_spark() -> SparkSession:
     return (
-        SparkSession.builder
-        .appName("SafeRx-ETL-Transform-MedMa")
-        .config("spark.sql.shuffle.partitions", "4")          # petit dataset
+        SparkSession.builder.appName("SafeRx-ETL-Transform-MedMa")
+        .config("spark.sql.shuffle.partitions", "4")  # petit dataset
         .config("spark.driver.memory", "2g")
         .getOrCreate()
     )
@@ -41,6 +41,7 @@ def get_spark() -> SparkSession:
 # 2. Extraction du prix  (UDF)
 #    "372.00 dhs" → 372.0      None si non parseable
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @F.udf(FloatType())
 def parse_price(raw):
@@ -57,6 +58,7 @@ def parse_price(raw):
 #    "Aucun" → None  |  "A"/"B"/"C" → conservé
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @F.udf(StringType())
 def clean_toxicity(val):
     if not val:
@@ -72,10 +74,21 @@ def clean_toxicity(val):
 # ════════════════════════════════════════════════════════════════════════════
 
 _WORD_TO_NUM = {
-    "un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4,
-    "cinq": 5, "six": 6, "sept": 7, "huit": 8, "neuf": 9,
-    "dix": 10, "onze": 11, "douze": 12,
+    "un": 1,
+    "une": 1,
+    "deux": 2,
+    "trois": 3,
+    "quatre": 4,
+    "cinq": 5,
+    "six": 6,
+    "sept": 7,
+    "huit": 8,
+    "neuf": 9,
+    "dix": 10,
+    "onze": 11,
+    "douze": 12,
 }
+
 
 @F.udf(StringType())
 def normalize_min_age(val):
@@ -91,7 +104,7 @@ def normalize_min_age(val):
 
     m = re.search(r"(\d+)\s*(ans?|mois)", v_low)
     if m:
-        qty  = int(m.group(1))
+        qty = int(m.group(1))
         unit = "ans" if m.group(2).startswith("an") else "mois"
         return f"{qty} {unit}"
     return v.strip() or None
@@ -102,6 +115,7 @@ def normalize_min_age(val):
 #    - retire \xa0, espaces multiples, caractères de contrôle
 #    - strip
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @F.udf(StringType())
 def clean_str(val):
@@ -123,6 +137,7 @@ def clean_str(val):
 #    Le CSV a une colonne "Substance (s) psychoactive (s)" = "Oui" ou vide
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @F.udf(BooleanType())
 def parse_psychoactive(val):
     if not val:
@@ -134,16 +149,18 @@ def parse_psychoactive(val):
 # 7. Normalisation du statut
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @F.udf(StringType())
 def clean_status(val):
     if not val:
-        return "Commercialisé"           # valeur par défaut du schéma
+        return "Commercialisé"  # valeur par défaut du schéma
     return val.strip()
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # 8. Transformation principale  →  DataFrame drugs_ma
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def transform_drugs_ma(spark: SparkSession) -> DataFrame:
     """
@@ -152,10 +169,9 @@ def transform_drugs_ma(spark: SparkSession) -> DataFrame:
     """
     print(f"[T] Lecture de {INPUT_CSV}")
     raw = (
-        spark.read
-        .option("header", "true")
+        spark.read.option("header", "true")
         .option("encoding", "UTF-8")
-        .option("multiLine", "true")        # les textes longs contiennent des \n
+        .option("multiLine", "true")  # les textes longs contiennent des \n
         .option("quote", '"')
         .option("escape", '"')
         .csv(str(INPUT_CSV))
@@ -165,88 +181,75 @@ def transform_drugs_ma(spark: SparkSession) -> DataFrame:
 
     # Renommage des colonnes brutes → noms intermédiaires lisibles
     df = (
-        raw
-        .withColumnRenamed("drug_name",                         "_brand_name_raw")
-        .withColumnRenamed("Présentation",                      "_presentation_raw")
-        .withColumnRenamed("Dosage",                            "_dosage_raw")
-        .withColumnRenamed("Distributeur ou fabriquant",        "_labo_raw")
-        .withColumnRenamed("Composition",                       "_composition_raw")
-        .withColumnRenamed("Classe thérapeutique",              "_class_raw")
-        .withColumnRenamed("Statut",                            "_statut_raw")
-        .withColumnRenamed("Code ATC",                          "_atc_raw")
-        .withColumnRenamed("PPV",                               "_ppv_raw")
-        .withColumnRenamed("Prix hospitalier",                  "_ph_raw")
-        .withColumnRenamed("Tableau",                           "_tableau_raw")
-        .withColumnRenamed("Nature du Produit",                 "_nature_raw")
-        .withColumnRenamed("Indication(s)",                     "_indic_raw")
-        .withColumnRenamed("Substance (s) psychoactive (s)",    "_psycho_raw")
-        .withColumnRenamed("Contres-indication(s)",             "_ci_raw")
-        .withColumnRenamed("Age minimal d'utilisation",         "_age_raw")
-        .withColumnRenamed("Lien du Produit",                   "_lien_raw")
+        raw.withColumnRenamed("drug_name", "_brand_name_raw")
+        .withColumnRenamed("Présentation", "_presentation_raw")
+        .withColumnRenamed("Dosage", "_dosage_raw")
+        .withColumnRenamed("Distributeur ou fabriquant", "_labo_raw")
+        .withColumnRenamed("Composition", "_composition_raw")
+        .withColumnRenamed("Classe thérapeutique", "_class_raw")
+        .withColumnRenamed("Statut", "_statut_raw")
+        .withColumnRenamed("Code ATC", "_atc_raw")
+        .withColumnRenamed("PPV", "_ppv_raw")
+        .withColumnRenamed("Prix hospitalier", "_ph_raw")
+        .withColumnRenamed("Tableau", "_tableau_raw")
+        .withColumnRenamed("Nature du Produit", "_nature_raw")
+        .withColumnRenamed("Indication(s)", "_indic_raw")
+        .withColumnRenamed("Substance (s) psychoactive (s)", "_psycho_raw")
+        .withColumnRenamed("Contres-indication(s)", "_ci_raw")
+        .withColumnRenamed("Age minimal d'utilisation", "_age_raw")
+        .withColumnRenamed("Lien du Produit", "_lien_raw")
     )
 
     # ── Transformations colonne par colonne ──────────────────────────────────
     df = (
         df
         # brand_name : strip + nettoyage
-        .withColumn("brand_name",        clean_str(F.col("_brand_name_raw")))
-
+        .withColumn("brand_name", clean_str(F.col("_brand_name_raw")))
         # presentation
-        .withColumn("presentation",      clean_str(F.col("_presentation_raw")))
-
+        .withColumn("presentation", clean_str(F.col("_presentation_raw")))
         # dosage_raw : conservé tel quel (nettoyé) — sera parsé dans dosage_rules (Vidal)
-        .withColumn("dosage_raw",        clean_str(F.col("_dosage_raw")))
-
+        .withColumn("dosage_raw", clean_str(F.col("_dosage_raw")))
         # dci : nettoyage + suppression des | multiples uniformes
         # On garde la chaîne complète ici ; la table dci_components fera le split
-        .withColumn("dci",               clean_str(F.col("_composition_raw")))
-
+        .withColumn("dci", clean_str(F.col("_composition_raw")))
         # labo_name
-        .withColumn("labo_name",         clean_str(F.col("_labo_raw")))
-
+        .withColumn("labo_name", clean_str(F.col("_labo_raw")))
         # therapeutic_class
         .withColumn("therapeutic_class", clean_str(F.col("_class_raw")))
-
         # status (default 'Commercialisé')
-        .withColumn("status",            clean_status(F.col("_statut_raw")))
-
+        .withColumn("status", clean_status(F.col("_statut_raw")))
         # atc_code : uppercase + strip
-        .withColumn("atc_code",
-            F.when(F.col("_atc_raw").isNotNull(),
-                   F.upper(F.trim(F.col("_atc_raw"))))
-             .otherwise(F.lit(None).cast(StringType()))
+        .withColumn(
+            "atc_code",
+            F.when(
+                F.col("_atc_raw").isNotNull(), F.upper(F.trim(F.col("_atc_raw")))
+            ).otherwise(F.lit(None).cast(StringType())),
         )
-
         # price_ppv : "19.10 dhs" → 19.10
-        .withColumn("price_ppv",         parse_price(F.col("_ppv_raw")))
-
+        .withColumn("price_ppv", parse_price(F.col("_ppv_raw")))
         # price_hospital
-        .withColumn("price_hospital",    parse_price(F.col("_ph_raw")))
-
+        .withColumn("price_hospital", parse_price(F.col("_ph_raw")))
         # toxicity_class : "Aucun" → NULL, A/B/C conservé
-        .withColumn("toxicity_class",    clean_toxicity(F.col("_tableau_raw")))
-
+        .withColumn("toxicity_class", clean_toxicity(F.col("_tableau_raw")))
         # product_type
-        .withColumn("product_type",      clean_str(F.col("_nature_raw")))
-
+        .withColumn("product_type", clean_str(F.col("_nature_raw")))
         # indications
-        .withColumn("indications",       clean_str(F.col("_indic_raw")))
-
+        .withColumn("indications", clean_str(F.col("_indic_raw")))
         # is_psychoactive
-        .withColumn("is_psychoactive",   parse_psychoactive(F.col("_psycho_raw")))
-
+        .withColumn("is_psychoactive", parse_psychoactive(F.col("_psycho_raw")))
         # contraindications
         .withColumn("contraindications", clean_str(F.col("_ci_raw")))
-
         # min_age normalisé ("15 ans", "30 mois", None)
-        .withColumn("min_age",           normalize_min_age(F.col("_age_raw")))
-
+        .withColumn("min_age", normalize_min_age(F.col("_age_raw")))
         # source_url : "Cliquez ici" est inutilisable → NULL
-        .withColumn("source_url",
+        .withColumn(
+            "source_url",
             F.when(
-                F.lower(F.trim(F.col("_lien_raw"))).isin("cliquez ici", "click here", ""),
-                F.lit(None).cast(StringType())
-            ).otherwise(clean_str(F.col("_lien_raw")))
+                F.lower(F.trim(F.col("_lien_raw"))).isin(
+                    "cliquez ici", "click here", ""
+                ),
+                F.lit(None).cast(StringType()),
+            ).otherwise(clean_str(F.col("_lien_raw"))),
         )
     )
 
@@ -256,6 +259,7 @@ def transform_drugs_ma(spark: SparkSession) -> DataFrame:
     # ── Ajout d'un ID déterministe (row_number) ──────────────────────────────
     # Important : stable si le CSV ne change pas d'ordre
     from pyspark.sql.window import Window
+
     window = Window.orderBy(F.col("brand_name"), F.col("atc_code"), F.col("dosage_raw"))
     df = df.withColumn("id", F.row_number().over(window))
 
@@ -282,7 +286,7 @@ def transform_drugs_ma(spark: SparkSession) -> DataFrame:
     )
 
     print(f"[T] Lignes après nettoyage drugs_ma : {final.count()}")
-    return final, df   # df conservé avec l'id pour la table DCI
+    return final, df  # df conservé avec l'id pour la table DCI
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -293,6 +297,7 @@ def transform_drugs_ma(spark: SparkSession) -> DataFrame:
 #                 (drug_id=X, dci="Vitamine B1",              position=3)
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def build_dci_components(df_with_id: DataFrame) -> DataFrame:
     """
     Éclate la colonne dci (composition) en une table de jointure
@@ -301,16 +306,17 @@ def build_dci_components(df_with_id: DataFrame) -> DataFrame:
     """
     # Split sur le séparateur '|' (avec espaces variables et \xa0 déjà nettoyé)
     dci_exploded = (
-        df_with_id
-        .select("id", "dci")
+        df_with_id.select("id", "dci")
         .filter(F.col("dci").isNotNull())
-        .withColumn("dci_array",
-            F.split(F.regexp_replace(F.col("dci"), r"\s*\|\s*", "|"), r"\|")
+        .withColumn(
+            "dci_array",
+            F.split(F.regexp_replace(F.col("dci"), r"\s*\|\s*", "|"), r"\|"),
         )
         .withColumn("dci_raw", F.explode("dci_array"))
-        .withColumn("dci_clean",
+        .withColumn(
+            "dci_clean",
             # Nettoyage de chaque DCI individuelle
-            F.trim(F.regexp_replace(F.col("dci_raw"), r"\s+", " "))
+            F.trim(F.regexp_replace(F.col("dci_raw"), r"\s+", " ")),
         )
         .filter(F.col("dci_clean") != "")
         .filter(F.length(F.col("dci_clean")) > 1)
@@ -318,15 +324,12 @@ def build_dci_components(df_with_id: DataFrame) -> DataFrame:
 
     # Ajout de la position (1=première DCI = molécule principale)
     from pyspark.sql.window import Window
+
     w = Window.partitionBy("id").orderBy(F.monotonically_increasing_id())
-    dci_final = (
-        dci_exploded
-        .withColumn("position", F.row_number().over(w))
-        .select(
-            F.col("id").alias("drug_id"),
-            F.col("dci_clean").alias("dci"),
-            F.col("position"),
-        )
+    dci_final = dci_exploded.withColumn("position", F.row_number().over(w)).select(
+        F.col("id").alias("drug_id"),
+        F.col("dci_clean").alias("dci"),
+        F.col("position"),
     )
 
     print(f"[T] Lignes dci_components : {dci_final.count()}")
@@ -337,19 +340,26 @@ def build_dci_components(df_with_id: DataFrame) -> DataFrame:
 # 10. Rapport de qualité des données
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def print_quality_report(df: DataFrame):
     total = df.count()
     print("\n" + "═" * 55)
     print("  RAPPORT QUALITÉ — drugs_ma")
     print("═" * 55)
     cols_to_check = [
-        "brand_name", "dci", "labo_name", "atc_code",
-        "price_ppv", "price_hospital", "toxicity_class",
-        "product_type", "therapeutic_class",
+        "brand_name",
+        "dci",
+        "labo_name",
+        "atc_code",
+        "price_ppv",
+        "price_hospital",
+        "toxicity_class",
+        "product_type",
+        "therapeutic_class",
     ]
     for col in cols_to_check:
         null_count = df.filter(F.col(col).isNull()).count()
-        fill_pct   = round((total - null_count) / total * 100, 1)
+        fill_pct = round((total - null_count) / total * 100, 1)
         print(f"  {col:<22}  {fill_pct:5.1f}%  ({total - null_count}/{total})")
 
     print("═" * 55)
@@ -360,11 +370,13 @@ def print_quality_report(df: DataFrame):
 
     # Distribution product_type
     print("  product_type distribution :")
-    df.groupBy("product_type").count().orderBy(F.col("count").desc()).show(truncate=False)
+    df.groupBy("product_type").count().orderBy(F.col("count").desc()).show(
+        truncate=False
+    )
 
     # Produits multi-DCI
     multi = df.filter(F.col("dci").contains("|")).count()
-    print(f"  Produits multi-DCI : {multi}/{total} ({round(multi/total*100,1)}%)")
+    print(f"  Produits multi-DCI : {multi}/{total} ({round(multi / total * 100, 1)}%)")
     print()
 
 
@@ -372,32 +384,29 @@ def print_quality_report(df: DataFrame):
 # 11. Écriture des outputs
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def write_outputs(drugs_df: DataFrame, dci_df: DataFrame):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"[T] Écriture → {OUTPUT_DRUGS}")
     (
-        drugs_df
-        .coalesce(1)
-        .write
-        .mode("overwrite")
+        drugs_df.coalesce(1)
+        .write.mode("overwrite")
         .option("compression", "snappy")
         .parquet(OUTPUT_DRUGS)
     )
 
     print(f"[T] Écriture → {OUTPUT_DCI}")
     (
-        dci_df
-        .coalesce(1)
-        .write
-        .mode("overwrite")
+        dci_df.coalesce(1)
+        .write.mode("overwrite")
         .option("compression", "snappy")
         .parquet(OUTPUT_DCI)
     )
 
     # Aussi en CSV pour inspection rapide / chargement direct en BDD
     drugs_csv = str(OUTPUT_DIR / "drugs_ma_clean.csv")
-    dci_csv   = str(OUTPUT_DIR / "dci_components.csv")
+    dci_csv = str(OUTPUT_DIR / "dci_components.csv")
 
     print(f"[T] Écriture CSV → {drugs_csv}")
     drugs_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(drugs_csv)
@@ -411,6 +420,7 @@ def write_outputs(drugs_df: DataFrame, dci_df: DataFrame):
 # ════════════════════════════════════════════════════════════════════════════
 # 12. Point d'entrée
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def main():
     if not INPUT_CSV.exists():

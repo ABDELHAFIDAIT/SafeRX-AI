@@ -16,15 +16,17 @@ from backend.app.models.drug_interaction import DrugInteraction
 from backend.app.models.patient import Patient
 from backend.app.models.prescription import PrescriptionLine
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _age_years(birthdate: date) -> int:
     today = date.today()
-    return today.year - birthdate.year - (
-        (today.month, today.day) < (birthdate.month, birthdate.day)
+    return (
+        today.year
+        - birthdate.year
+        - ((today.month, today.day) < (birthdate.month, birthdate.day))
     )
 
 
@@ -61,8 +63,16 @@ def _parse_min_age_years(raw: str | None) -> int | None:
 def _mentions_pregnancy(text: str | None) -> bool:
     if not text:
         return False
-    kw = ("grossesse", "enceinte", "pregnant", "pregnancy",
-          "tératogène", "teratogen", "foetus", "fœtus")
+    kw = (
+        "grossesse",
+        "enceinte",
+        "pregnant",
+        "pregnancy",
+        "tératogène",
+        "teratogen",
+        "foetus",
+        "fœtus",
+    )
     return any(k in text.lower() for k in kw)
 
 
@@ -76,6 +86,7 @@ def _mentions_breastfeeding(text: str | None) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 #  Règle 6 — INTERACTION
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _check_interactions(
     db: Session,
@@ -136,8 +147,7 @@ def _check_interactions(
                     continue
 
                 # Éviter les alertes dupliquées pour la même paire de lignes
-                pair_key = frozenset([line_a.id, line_b.id,
-                                      inter.dci_a, inter.dci_b])
+                pair_key = frozenset([line_a.id, line_b.id, inter.dci_a, inter.dci_b])
                 if pair_key in seen_pairs:
                     continue
                 seen_pairs.add(pair_key)
@@ -157,13 +167,15 @@ def _check_interactions(
                     detail_parts.append(f"Conduite : {inter.recommendation}")
 
                 # Alerte rattachée à la ligne "partenaire" (line_b)
-                alerts.append(CdsAlert(
-                    prescription_line_id=line_b.id,
-                    alert_type="INTERACTION",
-                    severity=inter.severity,
-                    title=f"Interaction médicamenteuse — {name_a} / {name_b}",
-                    detail=" ".join(detail_parts),
-                ))
+                alerts.append(
+                    CdsAlert(
+                        prescription_line_id=line_b.id,
+                        alert_type="INTERACTION",
+                        severity=inter.severity,
+                        title=f"Interaction médicamenteuse — {name_a} / {name_b}",
+                        detail=" ".join(detail_parts),
+                    )
+                )
 
     return alerts
 
@@ -171,6 +183,7 @@ def _check_interactions(
 # ─────────────────────────────────────────────────────────────────────────────
 #  Moteur principal
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def analyse_prescription(
     db: Session,
@@ -185,18 +198,13 @@ def analyse_prescription(
     drug_ids = [line.drug_id for line in lines]
 
     drugs_by_id: dict[int, Drug] = {
-        d.id: d
-        for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
+        d.id: d for d in db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
     }
 
     # primary_dcis : TOUTES les DCI (pour ALLERGY — couvre tous les composants)
     primary_dcis: dict[int, List[str]] = {}
-    for comp in (
-        db.query(DciComponent).filter(DciComponent.drug_id.in_(drug_ids)).all()
-    ):
-        primary_dcis.setdefault(comp.drug_id, []).append(
-            _normalize_dci(comp.dci)
-        )
+    for comp in db.query(DciComponent).filter(DciComponent.drug_id.in_(drug_ids)).all():
+        primary_dcis.setdefault(comp.drug_id, []).append(_normalize_dci(comp.dci))
 
     # main_dci : DCI PRIMAIRE uniquement (position=1) — pour REDUNDANT_DCI
     # Évite de signaler comme "redondance" les excipients ou DCI secondaires
@@ -219,74 +227,183 @@ def analyse_prescription(
     ALLERGY_FAMILY_MAP: dict[str, List[str]] = {
         # ── Bêta-lactamines / Pénicillines ──────────────────────────────────
         # Inclut les céphalosporines (allergie croisée ~1-10%)
-        "pénicilline":      ["cilline", "cillin", "amoxicilline", "ampicilline",
-                             "oxacilline", "cloxacilline", "flucloxacilline",
-                             "pivmécillinam", "pénicilline", "bêta-lactamine",
-                             # Céphalosporines (croisée)
-                             "céfixime", "cefixime", "céfazoline", "cefazoline",
-                             "céfalexine", "cefalexine", "ceftriaxone", "cefotaxime",
-                             "céfuroxime", "cefuroxime", "ceftazidime"],
-        "penicilline":      ["cilline", "cillin", "amoxicilline", "ampicilline",
-                             "oxacilline", "cloxacilline", "pénicilline",
-                             "céfixime", "cefixime", "ceftriaxone", "céfazoline"],
+        "pénicilline": [
+            "cilline",
+            "cillin",
+            "amoxicilline",
+            "ampicilline",
+            "oxacilline",
+            "cloxacilline",
+            "flucloxacilline",
+            "pivmécillinam",
+            "pénicilline",
+            "bêta-lactamine",
+            # Céphalosporines (croisée)
+            "céfixime",
+            "cefixime",
+            "céfazoline",
+            "cefazoline",
+            "céfalexine",
+            "cefalexine",
+            "ceftriaxone",
+            "cefotaxime",
+            "céfuroxime",
+            "cefuroxime",
+            "ceftazidime",
+        ],
+        "penicilline": [
+            "cilline",
+            "cillin",
+            "amoxicilline",
+            "ampicilline",
+            "oxacilline",
+            "cloxacilline",
+            "pénicilline",
+            "céfixime",
+            "cefixime",
+            "ceftriaxone",
+            "céfazoline",
+        ],
         # Molécules individuelles → leur famille entière
-        "amoxicilline":     ["cilline", "cillin", "ampicilline", "oxacilline",
-                             "céfixime", "cefixime", "ceftriaxone"],
-        "ampicilline":      ["cilline", "cillin", "amoxicilline", "oxacilline",
-                             "céfixime", "cefixime"],
-
+        "amoxicilline": [
+            "cilline",
+            "cillin",
+            "ampicilline",
+            "oxacilline",
+            "céfixime",
+            "cefixime",
+            "ceftriaxone",
+        ],
+        "ampicilline": [
+            "cilline",
+            "cillin",
+            "amoxicilline",
+            "oxacilline",
+            "céfixime",
+            "cefixime",
+        ],
         # ── Sulfamides ───────────────────────────────────────────────────────
-        "sulfamide":        ["sulfaméthoxazole", "sulfamethoxazole", "sulfamide",
-                             "cotrimoxazole", "triméthoprime", "trimethoprime",
-                             "sulfadiazine", "sulfadoxine", "sulfasalazine"],
-        "sulfamides":       ["sulfaméthoxazole", "sulfamethoxazole", "sulfamide",
-                             "cotrimoxazole", "sulfadiazine", "sulfasalazine"],
-        "sulfaméthoxazole": ["sulfaméthoxazole", "sulfamethoxazole", "sulfamide",
-                             "cotrimoxazole", "sulfadiazine"],
-
+        "sulfamide": [
+            "sulfaméthoxazole",
+            "sulfamethoxazole",
+            "sulfamide",
+            "cotrimoxazole",
+            "triméthoprime",
+            "trimethoprime",
+            "sulfadiazine",
+            "sulfadoxine",
+            "sulfasalazine",
+        ],
+        "sulfamides": [
+            "sulfaméthoxazole",
+            "sulfamethoxazole",
+            "sulfamide",
+            "cotrimoxazole",
+            "sulfadiazine",
+            "sulfasalazine",
+        ],
+        "sulfaméthoxazole": [
+            "sulfaméthoxazole",
+            "sulfamethoxazole",
+            "sulfamide",
+            "cotrimoxazole",
+            "sulfadiazine",
+        ],
         # ── Céphalosporines ──────────────────────────────────────────────────
-        "céphalosporine":   ["céfazoline", "céfalexine", "cefazoline", "cefalexine",
-                             "céfixime", "cefixime", "ceftriaxone", "cefotaxime",
-                             "céfuroxime", "cefuroxime"],
-        "cephalosporine":   ["céfazoline", "céfalexine", "cefazoline", "cefalexine",
-                             "céfixime", "cefixime", "ceftriaxone"],
-
+        "céphalosporine": [
+            "céfazoline",
+            "céfalexine",
+            "cefazoline",
+            "cefalexine",
+            "céfixime",
+            "cefixime",
+            "ceftriaxone",
+            "cefotaxime",
+            "céfuroxime",
+            "cefuroxime",
+        ],
+        "cephalosporine": [
+            "céfazoline",
+            "céfalexine",
+            "cefazoline",
+            "cefalexine",
+            "céfixime",
+            "cefixime",
+            "ceftriaxone",
+        ],
         # ── AINS ─────────────────────────────────────────────────────────────
-        "aspirine":         ["acide acétylsalicylique", "acetylsalicylique",
-                             "ibuprofène", "ibuprofene",
-                             "naproxène", "naproxene",
-                             "diclofénac", "diclofenac",
-                             "kétorolac", "ketorolac", "méloxicam", "meloxicam"],
-        "ibuprofène":       ["acide acétylsalicylique", "naproxène", "diclofénac",
-                             "kétorolac", "méloxicam"],
-        "ibuprofene":       ["acide acetylsalicylique", "naproxene", "diclofenac"],
-
+        "aspirine": [
+            "acide acétylsalicylique",
+            "acetylsalicylique",
+            "ibuprofène",
+            "ibuprofene",
+            "naproxène",
+            "naproxene",
+            "diclofénac",
+            "diclofenac",
+            "kétorolac",
+            "ketorolac",
+            "méloxicam",
+            "meloxicam",
+        ],
+        "ibuprofène": [
+            "acide acétylsalicylique",
+            "naproxène",
+            "diclofénac",
+            "kétorolac",
+            "méloxicam",
+        ],
+        "ibuprofene": ["acide acetylsalicylique", "naproxene", "diclofenac"],
         # ── Iode ─────────────────────────────────────────────────────────────
-        "iode":             ["iode", "iodé", "iodée", "povidone", "levothyroxine",
-                             "lévothyroxine", "amiodarone"],
-
+        "iode": [
+            "iode",
+            "iodé",
+            "iodée",
+            "povidone",
+            "levothyroxine",
+            "lévothyroxine",
+            "amiodarone",
+        ],
         # ── Latex ────────────────────────────────────────────────────────────
-        "latex":            ["latex"],
-
+        "latex": ["latex"],
         # ── Arachide / soja ──────────────────────────────────────────────────
-        "arachide":         ["arachide", "huile d'arachide", "soja", "lécithine de soja"],
-        "arachides":        ["arachide", "huile d'arachide", "soja", "lécithine de soja"],
-
+        "arachide": ["arachide", "huile d'arachide", "soja", "lécithine de soja"],
+        "arachides": ["arachide", "huile d'arachide", "soja", "lécithine de soja"],
         # ── Gluten / lactose (excipients) ────────────────────────────────────
-        "gluten":           ["gluten", "blé", "orge", "seigle"],
-        "lactose":          ["lactose", "lactulose"],
-
+        "gluten": ["gluten", "blé", "orge", "seigle"],
+        "lactose": ["lactose", "lactulose"],
         # ── Quinolones ───────────────────────────────────────────────────────
-        "quinolone":        ["floxacine", "floxacin", "ofloxacine", "ciprofloxacine",
-                             "lévofloxacine", "moxifloxacine", "norfloxacine"],
-        "quinolones":       ["floxacine", "floxacin", "ofloxacine", "ciprofloxacine",
-                             "lévofloxacine", "moxifloxacine"],
-
+        "quinolone": [
+            "floxacine",
+            "floxacin",
+            "ofloxacine",
+            "ciprofloxacine",
+            "lévofloxacine",
+            "moxifloxacine",
+            "norfloxacine",
+        ],
+        "quinolones": [
+            "floxacine",
+            "floxacin",
+            "ofloxacine",
+            "ciprofloxacine",
+            "lévofloxacine",
+            "moxifloxacine",
+        ],
         # ── Macrolides ───────────────────────────────────────────────────────
-        "macrolide":        ["azithromycine", "clarithromycine", "érythromycine",
-                             "spiramycine", "roxithromycine"],
-        "macrolides":       ["azithromycine", "clarithromycine", "érythromycine",
-                             "spiramycine"],
+        "macrolide": [
+            "azithromycine",
+            "clarithromycine",
+            "érythromycine",
+            "spiramycine",
+            "roxithromycine",
+        ],
+        "macrolides": [
+            "azithromycine",
+            "clarithromycine",
+            "érythromycine",
+            "spiramycine",
+        ],
     }
 
     patient_allergies: set[str] = set()
@@ -311,50 +428,59 @@ def analyse_prescription(
     #   2. Texte libre          → excipients dans contraindications / dci brut
     #   3. Famille pharmacologique → "allergie pénicilline" → amoxicilline = pénicilline
     for line in lines:
-        drug      = drugs_by_id.get(line.drug_id)
+        drug = drugs_by_id.get(line.drug_id)
         line_dcis = primary_dcis.get(line.drug_id, [_normalize_dci(line.dci)])
         already_alerted = False
 
         # Niveau 1 : match DCI exacte
         hit_dci = patient_allergies & set(line_dcis)
         if hit_dci:
-            alerts.append(CdsAlert(
-                prescription_line_id=line.id,
-                alert_type="ALLERGY",
-                severity="MAJOR",
-                title=f"Allergie connue — {line.dci}",
-                detail=(
-                    f"Le patient a une allergie documentée à : "
-                    f"{', '.join(hit_dci)}. "
-                    f"Médicament prescrit : {drug.brand_name if drug else line.dci}."
-                ),
-            ))
+            alerts.append(
+                CdsAlert(
+                    prescription_line_id=line.id,
+                    alert_type="ALLERGY",
+                    severity="MAJOR",
+                    title=f"Allergie connue — {line.dci}",
+                    detail=(
+                        f"Le patient a une allergie documentée à : "
+                        f"{', '.join(hit_dci)}. "
+                        f"Médicament prescrit : {drug.brand_name if drug else line.dci}."
+                    ),
+                )
+            )
             already_alerted = True
 
         # Niveau 2 : chercher l'allergène dans le texte libre
         if not already_alerted and drug:
-            searchable_text = " ".join(filter(None, [
-                drug.contraindications or "",
-                drug.dci              or "",
-                drug.indications      or "",
-                drug.brand_name       or "",
-            ])).lower()
+            searchable_text = " ".join(
+                filter(
+                    None,
+                    [
+                        drug.contraindications or "",
+                        drug.dci or "",
+                        drug.indications or "",
+                        drug.brand_name or "",
+                    ],
+                )
+            ).lower()
 
             for allergen in patient_allergies:
-                pattern = r'\b' + re.escape(allergen) + r'\b'
+                pattern = r"\b" + re.escape(allergen) + r"\b"
                 if re.search(pattern, searchable_text):
-                    alerts.append(CdsAlert(
-                        prescription_line_id=line.id,
-                        alert_type="ALLERGY",
-                        severity="MAJOR",
-                        title=f"Allergie potentielle — {drug.brand_name}",
-                        detail=(
-                            f"Le médicament {drug.brand_name} peut contenir ou être associé à "
-                            f"'{allergen}' (excipient ou contre-indication). "
-                            f"Allergie documentée : {allergen}. "
-                            f"Vérifier la composition complète avant de dispenser."
-                        ),
-                    ))
+                    alerts.append(
+                        CdsAlert(
+                            prescription_line_id=line.id,
+                            alert_type="ALLERGY",
+                            severity="MAJOR",
+                            title=f"Allergie potentielle — {drug.brand_name}",
+                            detail=(
+                                f"Le médicament {drug.brand_name} peut contenir ou être associé à "
+                                f"'{allergen}' (excipient ou contre-indication). "
+                                f"Allergie documentée : {allergen}. "
+                                f"Vérifier la composition complète avant de dispenser."
+                            ),
+                        )
+                    )
                     already_alerted = True
                     break
 
@@ -369,29 +495,33 @@ def analyse_prescription(
                         allergen_display = allergen.capitalize()
                         # Récupérer l'allergie originale (avant singulier/pluriel)
                         allergen_original = next(
-                            (a for a in (patient.known_allergies or [])
-                             if _normalize_dci(a) == allergen
-                             or _normalize_dci(a).rstrip("s") == allergen
-                             or _normalize_dci(a) + "s" == allergen),
-                            allergen_display
+                            (
+                                a
+                                for a in (patient.known_allergies or [])
+                                if _normalize_dci(a) == allergen
+                                or _normalize_dci(a).rstrip("s") == allergen
+                                or _normalize_dci(a) + "s" == allergen
+                            ),
+                            allergen_display,
                         )
                         # DCI affichée = celle qui a matché le keyword (plus précis)
                         matched_dci = next(
-                            (d for d in line_dcis if keyword in d.lower()),
-                            line.dci
+                            (d for d in line_dcis if keyword in d.lower()), line.dci
                         )
-                        alerts.append(CdsAlert(
-                            prescription_line_id=line.id,
-                            alert_type="ALLERGY",
-                            severity="MAJOR",
-                            title=f"Allergie croisée — {drug.brand_name if drug else line.dci}",
-                            detail=(
-                                f"Le patient est allergique aux {allergen_original}. "
-                                f"Le médicament prescrit ({drug.brand_name if drug else line.dci}) "
-                                f"appartient à cette famille ou présente un risque de réaction croisée "
-                                f"(DCI : {matched_dci.capitalize()}). Vérifier avant administration."
-                            ),
-                        ))
+                        alerts.append(
+                            CdsAlert(
+                                prescription_line_id=line.id,
+                                alert_type="ALLERGY",
+                                severity="MAJOR",
+                                title=f"Allergie croisée — {drug.brand_name if drug else line.dci}",
+                                detail=(
+                                    f"Le patient est allergique aux {allergen_original}. "
+                                    f"Le médicament prescrit ({drug.brand_name if drug else line.dci}) "
+                                    f"appartient à cette famille ou présente un risque de réaction croisée "
+                                    f"(DCI : {matched_dci.capitalize()}). Vérifier avant administration."
+                                ),
+                            )
+                        )
                         already_alerted = True
                         break
                 if already_alerted:
@@ -402,6 +532,7 @@ def analyse_prescription(
     for dci_norm, dup_lines in dci_to_lines.items():
         if len(dup_lines) > 1 and dci_norm not in seen_redondances:
             seen_redondances.add(dci_norm)
+
             # Construire la liste des médicaments avec dose pour les différencier
             # Si même brand_name (même drug_id × 2), afficher avec la dose prescrite
             def _line_label(l):
@@ -418,17 +549,19 @@ def analyse_prescription(
 
             dci_display = dci_norm.capitalize()
             for line in dup_lines[1:]:
-                alerts.append(CdsAlert(
-                    prescription_line_id=line.id,
-                    alert_type="REDUNDANT_DCI",
-                    severity="MODERATE",
-                    title=f"Redondance de DCI — {dci_display}",
-                    detail=(
-                        f"La molécule '{dci_display}' est présente dans plusieurs "
-                        f"lignes de la prescription : {', '.join(drug_labels)}. "
-                        f"Risque de surdosage cumulatif."
-                    ),
-                ))
+                alerts.append(
+                    CdsAlert(
+                        prescription_line_id=line.id,
+                        alert_type="REDUNDANT_DCI",
+                        severity="MODERATE",
+                        title=f"Redondance de DCI — {dci_display}",
+                        detail=(
+                            f"La molécule '{dci_display}' est présente dans plusieurs "
+                            f"lignes de la prescription : {', '.join(drug_labels)}. "
+                            f"Risque de surdosage cumulatif."
+                        ),
+                    )
+                )
 
     # ── Règle 3 : POSOLOGY (âge minimal) ────────────────────────────────
     if patient_age is not None:
@@ -438,16 +571,18 @@ def analyse_prescription(
                 continue
             min_years = _parse_min_age_years(drug.min_age)
             if min_years is not None and patient_age < min_years:
-                alerts.append(CdsAlert(
-                    prescription_line_id=line.id,
-                    alert_type="POSOLOGY",
-                    severity="MAJOR",
-                    title=f"Âge insuffisant — {drug.brand_name}",
-                    detail=(
-                        f"Ce médicament est autorisé à partir de {drug.min_age}. "
-                        f"Âge du patient : {patient_age} an(s)."
-                    ),
-                ))
+                alerts.append(
+                    CdsAlert(
+                        prescription_line_id=line.id,
+                        alert_type="POSOLOGY",
+                        severity="MAJOR",
+                        title=f"Âge insuffisant — {drug.brand_name}",
+                        detail=(
+                            f"Ce médicament est autorisé à partir de {drug.min_age}. "
+                            f"Âge du patient : {patient_age} an(s)."
+                        ),
+                    )
+                )
 
     # ── Règle 4 : CONTRA_INDICATION (grossesse / allaitement) ────────────
     for line in lines:
@@ -455,50 +590,57 @@ def analyse_prescription(
         if not drug:
             continue
         if patient.is_pregnant and _mentions_pregnancy(drug.contraindications):
-            alerts.append(CdsAlert(
-                prescription_line_id=line.id,
-                alert_type="CONTRA_INDICATION",
-                severity="MAJOR",
-                title=f"Contre-indication grossesse — {drug.brand_name}",
-                detail=(
-                    "La fiche du médicament mentionne une contre-indication "
-                    "liée à la grossesse."
-                    + (f" Semaine gestationelle : {patient.gestational_weeks}."
-                       if patient.gestational_weeks else "")
-                ),
-            ))
+            alerts.append(
+                CdsAlert(
+                    prescription_line_id=line.id,
+                    alert_type="CONTRA_INDICATION",
+                    severity="MAJOR",
+                    title=f"Contre-indication grossesse — {drug.brand_name}",
+                    detail=(
+                        "La fiche du médicament mentionne une contre-indication "
+                        "liée à la grossesse."
+                        + (
+                            f" Semaine gestationelle : {patient.gestational_weeks}."
+                            if patient.gestational_weeks
+                            else ""
+                        )
+                    ),
+                )
+            )
         if patient.is_breastfeeding and _mentions_breastfeeding(drug.contraindications):
-            alerts.append(CdsAlert(
-                prescription_line_id=line.id,
-                alert_type="CONTRA_INDICATION",
-                severity="MODERATE",
-                title=f"Contre-indication allaitement — {drug.brand_name}",
-                detail=(
-                    "La fiche du médicament mentionne une contre-indication "
-                    "liée à l'allaitement."
-                ),
-            ))
+            alerts.append(
+                CdsAlert(
+                    prescription_line_id=line.id,
+                    alert_type="CONTRA_INDICATION",
+                    severity="MODERATE",
+                    title=f"Contre-indication allaitement — {drug.brand_name}",
+                    detail=(
+                        "La fiche du médicament mentionne une contre-indication "
+                        "liée à l'allaitement."
+                    ),
+                )
+            )
 
     # ── Règle 5 : PSYCHOACTIVE (informatif) ─────────────────────────────
     for line in lines:
         drug = drugs_by_id.get(line.drug_id)
         if drug and drug.is_psychoactive:
-            alerts.append(CdsAlert(
-                prescription_line_id=line.id,
-                alert_type="POSOLOGY",
-                severity="MINOR",
-                title=f"Substance psychoactive — {drug.brand_name}",
-                detail=(
-                    "Ce médicament contient une ou plusieurs substances "
-                    "psychoactives. Vérifier l'absence de co-prescription "
-                    "sédative et informer le patient."
-                ),
-            ))
+            alerts.append(
+                CdsAlert(
+                    prescription_line_id=line.id,
+                    alert_type="POSOLOGY",
+                    severity="MINOR",
+                    title=f"Substance psychoactive — {drug.brand_name}",
+                    detail=(
+                        "Ce médicament contient une ou plusieurs substances "
+                        "psychoactives. Vérifier l'absence de co-prescription "
+                        "sédative et informer le patient."
+                    ),
+                )
+            )
 
     # ── Règle 6 : INTERACTION (Thésaurus ANSM) ───────────────────────────
-    alerts.extend(
-        _check_interactions(db, lines, primary_dcis, drugs_by_id)
-    )
+    alerts.extend(_check_interactions(db, lines, primary_dcis, drugs_by_id))
 
     # ── Règle 7 : RENAL — médicaments CI ou à ajuster en IRC ─────────────
     # Détecte les médicaments néphrotoxiques ou contre-indiqués selon la
@@ -510,67 +652,90 @@ def analyse_prescription(
         # Format: {keyword_dci: (seuil_mL/min, sévérité, message_risque)}
         RENAL_RISK_DRUGS: dict[str, tuple] = {
             # Metformine : CI si CrCl < 30, précaution si < 45
-            "metformine":       (45,  "MAJOR",    "contre-indication (risque d'acidose lactique)"),
-            "metformin":        (45,  "MAJOR",    "contre-indication (risque d'acidose lactique)"),
+            "metformine": (
+                45,
+                "MAJOR",
+                "contre-indication (risque d'acidose lactique)",
+            ),
+            "metformin": (45, "MAJOR", "contre-indication (risque d'acidose lactique)"),
             # AINS : néphrotoxiques, CI si IRC sévère
-            "ibuprofène":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
-            "ibuprofene":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
-            "naproxène":        (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
-            "diclofénac":       (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
-            "kétorolac":        (30,  "MAJOR",    "néphrotoxicité aggravée en IRC"),
+            "ibuprofène": (30, "MAJOR", "néphrotoxicité aggravée en IRC"),
+            "ibuprofene": (30, "MAJOR", "néphrotoxicité aggravée en IRC"),
+            "naproxène": (30, "MAJOR", "néphrotoxicité aggravée en IRC"),
+            "diclofénac": (30, "MAJOR", "néphrotoxicité aggravée en IRC"),
+            "kétorolac": (30, "MAJOR", "néphrotoxicité aggravée en IRC"),
             # Antibiotiques néphrotoxiques
-            "gentamicine":      (60,  "MAJOR",    "accumulation et néphrotoxicité"),
-            "vancomycine":      (50,  "MAJOR",    "accumulation et néphrotoxicité"),
-            "amikacine":        (60,  "MAJOR",    "accumulation et néphrotoxicité"),
+            "gentamicine": (60, "MAJOR", "accumulation et néphrotoxicité"),
+            "vancomycine": (50, "MAJOR", "accumulation et néphrotoxicité"),
+            "amikacine": (60, "MAJOR", "accumulation et néphrotoxicité"),
             # Anticoagulants à élimination rénale
-            "dabigatran":       (30,  "MAJOR",    "accumulation — risque hémorragique"),
-            "rivaroxaban":      (15,  "MAJOR",    "accumulation — risque hémorragique"),
-            "apixaban":         (25,  "MODERATE", "précaution, adapter la dose"),
+            "dabigatran": (30, "MAJOR", "accumulation — risque hémorragique"),
+            "rivaroxaban": (15, "MAJOR", "accumulation — risque hémorragique"),
+            "apixaban": (25, "MODERATE", "précaution, adapter la dose"),
             # Hypoglycémiants
-            "glyburide":        (60,  "MAJOR",    "risque d'hypoglycémie prolongée"),
-            "glibenclamide":    (60,  "MAJOR",    "risque d'hypoglycémie prolongée"),
-            "sitagliptine":     (45,  "MODERATE", "adapter la posologie à la fonction rénale"),
+            "glyburide": (60, "MAJOR", "risque d'hypoglycémie prolongée"),
+            "glibenclamide": (60, "MAJOR", "risque d'hypoglycémie prolongée"),
+            "sitagliptine": (
+                45,
+                "MODERATE",
+                "adapter la posologie à la fonction rénale",
+            ),
             # Diurétiques
-            "spironolactone":   (30,  "MAJOR",    "risque d'hyperkaliémie en IRC"),
-            "triamtérène":      (30,  "MAJOR",    "risque d'hyperkaliémie en IRC"),
+            "spironolactone": (30, "MAJOR", "risque d'hyperkaliémie en IRC"),
+            "triamtérène": (30, "MAJOR", "risque d'hyperkaliémie en IRC"),
             # Lithium
-            "lithium":          (50,  "MAJOR",    "accumulation — fenêtre thérapeutique étroite"),
+            "lithium": (50, "MAJOR", "accumulation — fenêtre thérapeutique étroite"),
             # Colchicine
-            "colchicine":       (30,  "MAJOR",    "accumulation — risque de myopathie/neuropathie"),
+            "colchicine": (
+                30,
+                "MAJOR",
+                "accumulation — risque de myopathie/neuropathie",
+            ),
             # Aciclovir
-            "aciclovir":        (25,  "MODERATE", "adapter la posologie"),
-            "valaciclovir":     (30,  "MODERATE", "adapter la posologie"),
+            "aciclovir": (25, "MODERATE", "adapter la posologie"),
+            "valaciclovir": (30, "MODERATE", "adapter la posologie"),
         }
 
         for line in lines:
             drug = drugs_by_id.get(line.drug_id)
             line_dcis_list = primary_dcis.get(line.drug_id, [_normalize_dci(line.dci)])
-            renal_alerted = False   # ← une seule alerte RENAL par ligne de prescription
+            renal_alerted = False  # ← une seule alerte RENAL par ligne de prescription
 
             for dci in line_dcis_list:
                 if renal_alerted:
                     break
-                for keyword, (threshold, severity, risk_msg) in RENAL_RISK_DRUGS.items():
+                for keyword, (
+                    threshold,
+                    severity,
+                    risk_msg,
+                ) in RENAL_RISK_DRUGS.items():
                     if keyword in dci and crcl < threshold:
                         irc_label = (
-                            "sévère (stade 4-5)" if crcl < 30 else
-                            "modérée (stade 3)"  if crcl < 45 else
-                            "légère (stade 2)"   if crcl < 60 else
-                            "débutante"
+                            "sévère (stade 4-5)"
+                            if crcl < 30
+                            else (
+                                "modérée (stade 3)"
+                                if crcl < 45
+                                else "légère (stade 2)"
+                                if crcl < 60
+                                else "débutante"
+                            )
                         )
-                        alerts.append(CdsAlert(
-                            prescription_line_id=line.id,
-                            alert_type="RENAL",
-                            severity=severity,
-                            title=f"Insuffisance rénale — {drug.brand_name if drug else line.dci}",
-                            detail=(
-                                f"Ce médicament est {risk_msg} "
-                                f"lorsque la clairance rénale est < {threshold} mL/min. "
-                                f"Clairance du patient : {crcl:.1f} mL/min "
-                                f"(IRC {irc_label}). "
-                                f"Adapter la posologie ou substituer."
-                            ),
-                        ))
+                        alerts.append(
+                            CdsAlert(
+                                prescription_line_id=line.id,
+                                alert_type="RENAL",
+                                severity=severity,
+                                title=f"Insuffisance rénale — {drug.brand_name if drug else line.dci}",
+                                detail=(
+                                    f"Ce médicament est {risk_msg} "
+                                    f"lorsque la clairance rénale est < {threshold} mL/min. "
+                                    f"Clairance du patient : {crcl:.1f} mL/min "
+                                    f"(IRC {irc_label}). "
+                                    f"Adapter la posologie ou substituer."
+                                ),
+                            )
+                        )
                         renal_alerted = True
                         break
 

@@ -14,11 +14,11 @@ def create_user(db: Session, user_in: UserCreate):
     # Crée un utilisateur avec mot de passe haché (usage interne, sans gestion first_login)
     hashed_password = get_password_hash(user_in.password)
     user = User(
-        first_name = user_in.first_name,
-        last_name  = user_in.last_name,
-        email      = user_in.email,
-        password   = hashed_password,
-        role       = user_in.role,
+        first_name=user_in.first_name,
+        last_name=user_in.last_name,
+        email=user_in.email,
+        password=hashed_password,
+        role=user_in.role,
     )
     db.add(user)
     db.commit()
@@ -30,13 +30,13 @@ def create_user_with_password(db: Session, user_in: UserCreate, password: str) -
     # Crée un utilisateur via l'admin avec mot de passe fourni et first_login=True
     hashed_password = get_password_hash(password)
     db_user = User(
-        first_name     = user_in.first_name,
-        last_name      = user_in.last_name,
-        email          = user_in.email,
-        password       = hashed_password,
-        role           = user_in.role,
-        is_first_login = True,   # force le changement de MDP à la première connexion
-        is_active      = True,
+        first_name=user_in.first_name,
+        last_name=user_in.last_name,
+        email=user_in.email,
+        password=hashed_password,
+        role=user_in.role,
+        is_first_login=True,  # force le changement de MDP à la première connexion
+        is_active=True,
     )
     db.add(db_user)
     db.commit()
@@ -46,9 +46,9 @@ def create_user_with_password(db: Session, user_in: UserCreate, password: str) -
 
 def update_password(db: Session, user: User, new_password: str) -> User:
     # Met à jour le mot de passe et désactive le flag first_login
-    user.password      = get_password_hash(new_password)
-    user.is_first_login = False                             # connexion initiale validée
-    user.updated_at    = datetime.now(timezone.utc)
+    user.password = get_password_hash(new_password)
+    user.is_first_login = False  # connexion initiale validée
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     return user

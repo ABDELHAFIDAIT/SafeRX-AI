@@ -11,20 +11,24 @@ def generate_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits + "!@#$%&*"
     password = [
         secrets.choice(string.ascii_uppercase),  # garantit une majuscule
-        secrets.choice(string.digits),            # garantit un chiffre
-        secrets.choice("!@#$%&*"),                # garantit un caractère spécial
+        secrets.choice(string.digits),  # garantit un chiffre
+        secrets.choice("!@#$%&*"),  # garantit un caractère spécial
     ]
     password += [secrets.choice(alphabet) for _ in range(length - 3)]
-    secrets.SystemRandom().shuffle(password)  # mélange aléatoire cryptographiquement sûr
+    secrets.SystemRandom().shuffle(
+        password
+    )  # mélange aléatoire cryptographiquement sûr
     return "".join(password)
 
 
-def send_credentials_email(to_email: str, first_name: str, role: str, plain_password: str) -> None:
+def send_credentials_email(
+    to_email: str, first_name: str, role: str, plain_password: str
+) -> None:
     # Traduit le rôle technique en label lisible pour l'affichage dans l'email
     role_labels = {
-        "doctor":     "Médecin",
+        "doctor": "Médecin",
         "pharmacist": "Pharmacien",
-        "admin":      "Administrateur",
+        "admin": "Administrateur",
     }
     role_label = role_labels.get(role, role.capitalize())
 
@@ -91,8 +95,8 @@ def send_credentials_email(to_email: str, first_name: str, role: str, plain_pass
     # Construit le message MIME multipart avec encodage HTML
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = settings.SMTP_FROM_EMAIL
-    msg["To"]      = to_email
+    msg["From"] = settings.SMTP_FROM_EMAIL
+    msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
 
     # Connexion SMTP avec TLS et authentification optionnelle selon la config

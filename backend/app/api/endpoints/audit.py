@@ -19,6 +19,7 @@ router = APIRouter()
 #  POST /audit — Logger une décision unique
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/",
     response_model=AuditOut,
@@ -39,28 +40,30 @@ def create_audit_entry(
         )
 
     entry = AuditCdsHook(
-        alert_id        = payload.alert_id,
-        prescription_id = payload.prescription_id,
-        doctor_id       = current_user.id,
-        decision        = payload.decision,
+        alert_id=payload.alert_id,
+        prescription_id=payload.prescription_id,
+        doctor_id=current_user.id,
+        decision=payload.decision,
         # Snapshot de l'alerte au moment de la décision
-        alert_type      = alert.alert_type,
-        alert_severity  = alert.severity,
-        alert_title     = alert.title,
-        justification   = payload.justification,
+        alert_type=alert.alert_type,
+        alert_severity=alert.severity,
+        alert_title=alert.title,
+        justification=payload.justification,
     )
 
     # ── §3.3 Validation sémantique (OVERRIDE uniquement) ─────────────────
     if payload.decision == "OVERRIDE" and payload.justification:
         result = validate_override_justification(
-            justification  = payload.justification,
-            alert_type     = alert.alert_type or "",
-            alert_severity = alert.severity   or "",
-            alert_title    = alert.title      or "",
+            justification=payload.justification,
+            alert_type=alert.alert_type or "",
+            alert_severity=alert.severity or "",
+            alert_title=alert.title or "",
         )
-        entry.justification_valid    = (
-            "valid" if result["valid"] is True
-            else "noise" if result["valid"] is False
+        entry.justification_valid = (
+            "valid"
+            if result["valid"] is True
+            else "noise"
+            if result["valid"] is False
             else None
         )
         entry.justification_feedback = result.get("feedback")
@@ -74,6 +77,7 @@ def create_audit_entry(
 # ─────────────────────────────────────────────────────────────────────────────
 #  POST /audit/bulk — Logger toutes les décisions d'une prescription
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/bulk",
@@ -93,27 +97,29 @@ def create_bulk_audit(
             continue  # On skip les alertes inconnues sans bloquer
 
         entry = AuditCdsHook(
-            alert_id        = decision.alert_id,
-            prescription_id = payload.prescription_id,
-            doctor_id       = current_user.id,
-            decision        = decision.decision,
-            alert_type      = alert.alert_type,
-            alert_severity  = alert.severity,
-            alert_title     = alert.title,
-            justification   = decision.justification,
+            alert_id=decision.alert_id,
+            prescription_id=payload.prescription_id,
+            doctor_id=current_user.id,
+            decision=decision.decision,
+            alert_type=alert.alert_type,
+            alert_severity=alert.severity,
+            alert_title=alert.title,
+            justification=decision.justification,
         )
 
         # ── §3.3 Validation sémantique (OVERRIDE uniquement) ─────────────
         if decision.decision == "OVERRIDE" and decision.justification:
             result = validate_override_justification(
-                justification  = decision.justification,
-                alert_type     = alert.alert_type or "",
-                alert_severity = alert.severity   or "",
-                alert_title    = alert.title      or "",
+                justification=decision.justification,
+                alert_type=alert.alert_type or "",
+                alert_severity=alert.severity or "",
+                alert_title=alert.title or "",
             )
-            entry.justification_valid    = (
-                "valid" if result["valid"] is True
-                else "noise" if result["valid"] is False
+            entry.justification_valid = (
+                "valid"
+                if result["valid"] is True
+                else "noise"
+                if result["valid"] is False
                 else None
             )
             entry.justification_feedback = result.get("feedback")
@@ -130,6 +136,7 @@ def create_bulk_audit(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /audit/prescription/{id} — Historique d'une prescription
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/prescription/{prescription_id}",
@@ -152,6 +159,7 @@ def get_audit_for_prescription(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /audit/recent — Flux récent (admin uniquement)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/recent",

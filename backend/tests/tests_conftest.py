@@ -1,14 +1,12 @@
 import sys
 import os
-from datetime import date, datetime
+from datetime import date
 from unittest.mock import MagicMock
 from typing import Optional
 
 _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _root not in sys.path:
     sys.path.insert(0, _root)
-
-import conftest as _root_conftest
 
 
 def _ensure_model_mock(module_path: str):

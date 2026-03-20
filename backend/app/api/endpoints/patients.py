@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.patient import Patient
 from backend.app.models.user import User, Role
-from backend.app.schemas.clinical_schemas import PatientCreate, PatientOut, PatientUpdate
+from backend.app.schemas.clinical_schemas import (
+    PatientCreate,
+    PatientOut,
+    PatientUpdate,
+)
 
 router = APIRouter()
 
@@ -30,6 +34,7 @@ def _payload_to_dict(payload: PatientCreate) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 #  POST / — Créer un dossier patient
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/",
@@ -55,6 +60,7 @@ def create_patient(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /search — AVANT /{patient_id} pour éviter le conflit de route
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/search",
@@ -90,6 +96,7 @@ def search_patients(
 #  GET / — Lister les patients
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/",
     response_model=list[PatientOut],
@@ -107,6 +114,7 @@ def list_patients(
 # ─────────────────────────────────────────────────────────────────────────────
 #  GET /{patient_id} — APRÈS /search et /
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/{patient_id}",
@@ -130,6 +138,7 @@ def get_patient(
 # ─────────────────────────────────────────────────────────────────────────────
 #  PATCH /{patient_id} — Mettre à jour un dossier patient
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.patch(
     "/{patient_id}",

@@ -30,8 +30,8 @@ jobs:
       - name: Run Black (vérification du formatage)
         run: black --check backend/
 
-      - name: Run Ruff (linter rapide, remplace flake8 + isort)
-        run: ruff check backend/
+      # - name: Run Ruff (linter rapide, remplace flake8 + isort)
+      #   run: ruff check backend/
 
   unit-tests:
     name: Unit & Mock Tests

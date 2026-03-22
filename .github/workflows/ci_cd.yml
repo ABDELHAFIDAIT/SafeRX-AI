@@ -30,7 +30,7 @@ jobs:
       - name: Run Black (vérification du formatage)
         run: black --check backend/
 
-      # - name: Run Ruff (linter rapide, remplace flake8 + isort)
+      # - name: Run Ruff (linter)
       #   run: ruff check backend/
 
   unit-tests:
@@ -46,28 +46,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install uv (résolveur de dépendances rapide)
+      - name: Install uv
         run: pip install uv
 
       - name: Install Dependencies
+        # On installe le MÊME requirements.txt qu'en local pour garantir
+        # un environnement identique — plus de divergence CI vs local
         run: |
-          uv pip install \
-            fastapi pydantic pydantic-settings \
-            sqlalchemy psycopg2-binary \
-            python-jose[cryptography] passlib[argon2] \
-            scikit-learn numpy \
-            prometheus-client prometheus_fastapi_instrumentator \
-            python-dotenv requests \
-            --system
+          uv pip install -r requirements-test.txt --system
           uv pip install pytest pytest-mock pytest-cov --system
 
       - name: Run Pytest
-        run: |
-          python -m pytest backend/tests/ \
-            -v \
-            --tb=short \
-            --cov=backend \
-            --cov-report=term-missing
+        run: python -m pytest backend/tests/ -v --tb=short --cov=backend --cov-report=term-missing
         env:
           PYTHONPATH: .
           DATABASE_URL: "sqlite:///:memory:"

@@ -49,6 +49,8 @@ def charger_handlers():
     if cle in sys.modules:
         del sys.modules[cle]
 
+    import backend.app.api.endpoints.audit  # déclenche les @router.post/get → capture
+
     return router._routes
 
 

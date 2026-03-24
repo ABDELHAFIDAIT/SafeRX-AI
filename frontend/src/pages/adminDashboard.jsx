@@ -18,7 +18,7 @@ import api from "../api/api";
 // Décision backend → label action UI
 const decisionToAction = {
     ACCEPTED: "ALERT_ACCEPTED",
-    IGNORED:  "ALERT_IGNORED",
+    IGNORED: "ALERT_IGNORED",
     OVERRIDE: "OVERRIDE",
 };
 
@@ -39,12 +39,12 @@ const formatDateTime = (iso) => {
 
 // topAlerts est maintenant dynamique (vient de GET /account/stats)
 const ALERT_TYPE_LABELS = {
-    INTERACTION:       "Interaction",
-    ALLERGY:           "Allergie",
+    INTERACTION: "Interaction",
+    ALLERGY: "Allergie",
     CONTRA_INDICATION: "Contre-indication",
-    REDUNDANT_DCI:     "Redondance DCI",
-    POSOLOGY:          "Posologie",
-    RENAL:             "Insuffisance rénale",
+    REDUNDANT_DCI: "Redondance DCI",
+    POSOLOGY: "Posologie",
+    RENAL: "Insuffisance rénale",
 };
 
 /* ─────────────────────────────────────────────────────────
@@ -54,15 +54,15 @@ const roleLabel = { doctor: "Médecin", pharmacist: "Pharmacien", admin: "Admini
 const roleColor = { doctor: "bg-blue-100 text-blue-700", pharmacist: "bg-emerald-100 text-emerald-700", admin: "bg-purple-100 text-purple-700" };
 
 const severityColor = {
-    MAJOR:    "text-red-600 bg-red-50 border-red-200",
+    MAJOR: "text-red-600 bg-red-50 border-red-200",
     MODERATE: "text-amber-600 bg-amber-50 border-amber-200",
-    MINOR:    "text-blue-600 bg-blue-50 border-blue-200",
-    NONE:     "text-slate-500 bg-slate-50 border-slate-200",
+    MINOR: "text-blue-600 bg-blue-50 border-blue-200",
+    NONE: "text-slate-500 bg-slate-50 border-slate-200",
 };
 const actionIcon = {
-    ALERT_ACCEPTED:  <CheckCircle2 size={13} className="text-emerald-500" />,
-    OVERRIDE:        <AlertTriangle size={13} className="text-amber-500" />,
-    ALERT_IGNORED:   <XCircle size={13} className="text-red-400" />,
+    ALERT_ACCEPTED: <CheckCircle2 size={13} className="text-emerald-500" />,
+    OVERRIDE: <AlertTriangle size={13} className="text-amber-500" />,
+    ALERT_IGNORED: <XCircle size={13} className="text-red-400" />,
     PRESCRIPTION_OK: <ShieldCheck size={13} className="text-blue-400" />,
 };
 
@@ -77,9 +77,9 @@ const Spinner = () => (
    SIDEBAR NAV ITEMS
 ───────────────────────────────────────────────────────── */
 const NAV = [
-    { id: "overview",  icon: LayoutDashboard, label: "Vue d'ensemble" },
-    { id: "users",     icon: Users,           label: "Utilisateurs"   },
-    { id: "audit",     icon: ClipboardList,   label: "Audit Trail"    },
+    { id: "overview", icon: LayoutDashboard, label: "Vue d'ensemble" },
+    { id: "users", icon: Users, label: "Utilisateurs" },
+    { id: "audit", icon: ClipboardList, label: "Audit Trail" },
 ];
 
 /* ─────────────────────────────────────────────────────────
@@ -112,10 +112,10 @@ const OverviewView = ({ stats, topAlerts = [] }) => (
     <div className="flex flex-col gap-6">
         {/* KPI Grid */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard icon={<Users size={18} className="text-blue-600" />}        label="Utilisateurs actifs"   value={stats.totalUsers}            accent="bg-blue-50"    />
-            <KpiCard icon={<Pill size={18} className="text-indigo-600" />}        label="Prescriptions / 24h"   value={stats.prescriptionsToday}    accent="bg-indigo-50"  />
-            <KpiCard icon={<Siren size={18} className="text-amber-600" />}        label="Décisions auditées"    value={stats.alertsToday}           accent="bg-amber-50"   />
-            <KpiCard icon={<ShieldCheck size={18} className="text-emerald-600" />}label="Taux de conformité"   value={`${stats.complianceRate}%`}  accent="bg-emerald-50" />
+            <KpiCard icon={<Users size={18} className="text-blue-600" />} label="Utilisateurs actifs" value={stats.totalUsers} accent="bg-blue-50" />
+            <KpiCard icon={<Pill size={18} className="text-indigo-600" />} label="Prescriptions / 24h" value={stats.prescriptionsToday} accent="bg-indigo-50" />
+            <KpiCard icon={<Siren size={18} className="text-amber-600" />} label="Décisions auditées" value={stats.alertsToday} accent="bg-amber-50" />
+            <KpiCard icon={<ShieldCheck size={18} className="text-emerald-600" />} label="Taux de conformité" value={`${stats.complianceRate}%`} accent="bg-emerald-50" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -128,27 +128,27 @@ const OverviewView = ({ stats, topAlerts = [] }) => (
                 {topAlerts.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-4">Aucune donnée d'audit disponible.</p>
                 ) : (
-                <div className="flex flex-col gap-2.5">
-                    {topAlerts.map((item, i) => (
-                        <div key={item.type} className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
-                            <div className="flex-1">
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="font-semibold text-slate-700">
-                                        {ALERT_TYPE_LABELS[item.type] || item.type}
-                                    </span>
-                                    <strong className="text-slate-600">{item.count}</strong>
-                                </div>
-                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full bg-blue-500 transition-all duration-700"
-                                        style={{ width: `${(item.count / topAlerts[0].count) * 100}%` }}
-                                    />
+                    <div className="flex flex-col gap-2.5">
+                        {topAlerts.map((item, i) => (
+                            <div key={item.type} className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
+                                <div className="flex-1">
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="font-semibold text-slate-700">
+                                            {ALERT_TYPE_LABELS[item.type] || item.type}
+                                        </span>
+                                        <strong className="text-slate-600">{item.count}</strong>
+                                    </div>
+                                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-blue-500 transition-all duration-700"
+                                            style={{ width: `${(item.count / topAlerts[0].count) * 100}%` }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
                 )}
             </div>
 
@@ -160,8 +160,8 @@ const OverviewView = ({ stats, topAlerts = [] }) => (
                 </div>
                 {[
                     { label: "Temps de réponse moyen", value: `${stats.avgResponseMs} ms`, ok: stats.avgResponseMs < 300, target: "< 300 ms" },
-                    { label: "Taux d'override",         value: `${stats.overrideRate}%`,  ok: stats.overrideRate < 20,   target: "< 20 %" },
-                    { label: "Conformité prescriptions", value: `${stats.complianceRate}%`,ok: stats.complianceRate > 80, target: "> 80 %" },
+                    { label: "Taux d'override", value: `${stats.overrideRate}%`, ok: stats.overrideRate < 20, target: "< 20 %" },
+                    { label: "Conformité prescriptions", value: `${stats.complianceRate}%`, ok: stats.complianceRate > 80, target: "> 80 %" },
                 ].map(({ label, value, ok, target }) => (
                     <div key={label} className="flex items-start justify-between gap-2">
                         <div>
@@ -172,7 +172,7 @@ const OverviewView = ({ stats, topAlerts = [] }) => (
                         <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? "bg-emerald-50" : "bg-red-50"}`}>
                             {ok
                                 ? <CheckCircle2 size={14} className="text-emerald-500" />
-                                : <AlertCircle  size={14} className="text-red-500" />
+                                : <AlertCircle size={14} className="text-red-500" />
                             }
                         </div>
                     </div>
@@ -195,18 +195,18 @@ const OverviewView = ({ stats, topAlerts = [] }) => (
 const USERS_PER_PAGE = 8;
 
 const UsersView = () => {
-    const [users, setUsers]               = useState([]);
-    const [search, setSearch]             = useState("");
-    const [roleFilter, setRoleFilter]     = useState("all");
-    const [showForm, setShowForm]         = useState(false);
-    const [formData, setFormData]         = useState({ first_name: "", last_name: "", email: "", role: "doctor" });
-    const [formError, setFormError]       = useState("");
-    const [formSuccess, setFormSuccess]   = useState("");
-    const [isLoading, setIsLoading]       = useState(false);
+    const [users, setUsers] = useState([]);
+    const [search, setSearch] = useState("");
+    const [roleFilter, setRoleFilter] = useState("all");
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({ first_name: "", last_name: "", email: "", role: "doctor" });
+    const [formError, setFormError] = useState("");
+    const [formSuccess, setFormSuccess] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
     const [loadingUsers, setLoadingUsers] = useState(true);
-    const [page, setPage]                 = useState(1);
+    const [page, setPage] = useState(1);
     const [actionLoading, setActionLoading] = useState({}); // {userId: "toggle"|"delete"|"reset"}
-    const [selectedUser, setSelectedUser]   = useState(null); // modal détail
+    const [selectedUser, setSelectedUser] = useState(null); // modal détail
     const [confirmDelete, setConfirmDelete] = useState(null); // userId à confirmer
 
     const fetchUsers = useCallback(async () => {
@@ -225,12 +225,12 @@ const UsersView = () => {
 
     const filtered = users.filter(u => {
         const matchSearch = `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(search.toLowerCase());
-        const matchRole   = roleFilter === "all" || u.role === roleFilter;
+        const matchRole = roleFilter === "all" || u.role === roleFilter;
         return matchSearch && matchRole;
     });
 
-    const totalPages  = Math.max(1, Math.ceil(filtered.length / USERS_PER_PAGE));
-    const paginated   = filtered.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_PER_PAGE));
+    const paginated = filtered.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
 
     // Reset page when filter changes
     useEffect(() => { setPage(1); }, [search, roleFilter]);
@@ -316,11 +316,11 @@ const UsersView = () => {
                         </p>
                         <div className="flex gap-2">
                             <button onClick={() => setConfirmDelete(null)}
-                                    className="flex-1 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-all">
+                                className="flex-1 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-all">
                                 Annuler
                             </button>
                             <button onClick={() => deleteUser(confirmDelete.id)}
-                                    className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all">
+                                className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all">
                                 Supprimer
                             </button>
                         </div>
@@ -349,10 +349,10 @@ const UsersView = () => {
                                 </div>
                             </div>
                             {[
-                                ["Rôle",             roleLabel[selectedUser.role] || selectedUser.role],
-                                ["Statut",           selectedUser.is_active ? "Actif" : "Inactif"],
-                                ["Première connexion",selectedUser.is_first_login ? "En attente" : "Complétée"],
-                                ["Créé le",          formatDate(selectedUser.created_at)],
+                                ["Rôle", roleLabel[selectedUser.role] || selectedUser.role],
+                                ["Statut", selectedUser.is_active ? "Actif" : "Inactif"],
+                                ["Première connexion", selectedUser.is_first_login ? "En attente" : "Complétée"],
+                                ["Créé le", formatDate(selectedUser.created_at)],
                             ].map(([k, v]) => (
                                 <div key={k} className="flex justify-between text-sm border-b border-slate-100 pb-2">
                                     <span className="text-slate-500">{k}</span>
@@ -361,7 +361,7 @@ const UsersView = () => {
                             ))}
                         </div>
                         <button onClick={() => setSelectedUser(null)}
-                                className="mt-5 w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 transition-all">
+                            className="mt-5 w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 transition-all">
                             Fermer
                         </button>
                     </div>
@@ -465,11 +465,10 @@ const UsersView = () => {
                                         key={r}
                                         type="button"
                                         onClick={() => setFormData(p => ({ ...p, role: r }))}
-                                        className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                                            formData.role === r
+                                        className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all ${formData.role === r
                                                 ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200"
                                                 : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
-                                        }`}
+                                            }`}
                                     >
                                         {r === "doctor" ? "🩺 Médecin" : "💊 Pharmacien"}
                                     </button>
@@ -541,71 +540,70 @@ const UsersView = () => {
                             {paginated.map(user => {
                                 const loading = actionLoading[user.id];
                                 return (
-                                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-4 py-3">
-                                        <button onClick={() => setSelectedUser(user)} className="flex items-center gap-3 text-left group">
-                                            <div className="w-8 h-8 rounded-xl bg-blue-950 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                                {user.first_name[0]}{user.last_name[0]}
+                                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-4 py-3">
+                                            <button onClick={() => setSelectedUser(user)} className="flex items-center gap-3 text-left group">
+                                                <div className="w-8 h-8 rounded-xl bg-blue-950 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                                    {user.first_name[0]}{user.last_name[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{user.first_name} {user.last_name}</p>
+                                                    <p className="text-xs text-slate-400">{user.email}</p>
+                                                </div>
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleColor[user.role]}`}>
+                                                {roleLabel[user.role]}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit ${user.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
+                                                {user.is_active ? "Actif" : "Inactif"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {user.is_first_login
+                                                ? <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">En attente</span>
+                                                : <span className="text-xs text-slate-400 flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-500" />Complété</span>
+                                            }
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-400">{formatDate(user.created_at)}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-1.5">
+                                                {/* Toggle actif/inactif */}
+                                                <button
+                                                    onClick={() => toggleActive(user.id)}
+                                                    disabled={!!loading}
+                                                    title={user.is_active ? "Désactiver" : "Activer"}
+                                                    className={`p-1.5 rounded-lg border transition-all disabled:opacity-40 ${user.is_active
+                                                            ? "border-red-200 text-red-500 hover:bg-red-50"
+                                                            : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                                        }`}>
+                                                    {loading === "toggle"
+                                                        ? <Spinner />
+                                                        : user.is_active ? <UserX size={13} /> : <UserCheck size={13} />}
+                                                </button>
+                                                {/* Réinitialiser MDP */}
+                                                <button
+                                                    onClick={() => resetPassword(user.id, user.email)}
+                                                    disabled={!!loading}
+                                                    title="Réinitialiser le mot de passe"
+                                                    className="p-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-40">
+                                                    {loading === "reset" ? <Spinner /> : <KeyRound size={13} />}
+                                                </button>
+                                                {/* Supprimer */}
+                                                <button
+                                                    onClick={() => setConfirmDelete({ id: user.id, name: `${user.first_name} ${user.last_name}` })}
+                                                    disabled={!!loading}
+                                                    title="Supprimer le compte"
+                                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all disabled:opacity-40">
+                                                    {loading === "delete" ? <Spinner /> : <Trash2 size={13} />}
+                                                </button>
                                             </div>
-                                            <div>
-                                                <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{user.first_name} {user.last_name}</p>
-                                                <p className="text-xs text-slate-400">{user.email}</p>
-                                            </div>
-                                        </button>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleColor[user.role]}`}>
-                                            {roleLabel[user.role]}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit ${user.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                                            {user.is_active ? "Actif" : "Inactif"}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {user.is_first_login
-                                            ? <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">En attente</span>
-                                            : <span className="text-xs text-slate-400 flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-500" />Complété</span>
-                                        }
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-slate-400">{formatDate(user.created_at)}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-1.5">
-                                            {/* Toggle actif/inactif */}
-                                            <button
-                                                onClick={() => toggleActive(user.id)}
-                                                disabled={!!loading}
-                                                title={user.is_active ? "Désactiver" : "Activer"}
-                                                className={`p-1.5 rounded-lg border transition-all disabled:opacity-40 ${
-                                                    user.is_active
-                                                        ? "border-red-200 text-red-500 hover:bg-red-50"
-                                                        : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                                                }`}>
-                                                {loading === "toggle"
-                                                    ? <Spinner />
-                                                    : user.is_active ? <UserX size={13} /> : <UserCheck size={13} />}
-                                            </button>
-                                            {/* Réinitialiser MDP */}
-                                            <button
-                                                onClick={() => resetPassword(user.id, user.email)}
-                                                disabled={!!loading}
-                                                title="Réinitialiser le mot de passe"
-                                                className="p-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-40">
-                                                {loading === "reset" ? <Spinner /> : <KeyRound size={13} />}
-                                            </button>
-                                            {/* Supprimer */}
-                                            <button
-                                                onClick={() => setConfirmDelete({ id: user.id, name: `${user.first_name} ${user.last_name}` })}
-                                                disabled={!!loading}
-                                                title="Supprimer le compte"
-                                                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all disabled:opacity-40">
-                                                {loading === "delete" ? <Spinner /> : <Trash2 size={13} />}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                    </tr>
                                 );
                             })}
                         </tbody>
@@ -621,12 +619,12 @@ const UsersView = () => {
                             Page {page}/{totalPages} · {filtered.length} utilisateurs
                         </p>
                         <div className="flex gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
-                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
                                 <ChevronLeft size={14} />
                             </button>
-                            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
-                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all">
                                 <ChevronRightIcon size={14} />
                             </button>
                         </div>
@@ -641,8 +639,8 @@ const UsersView = () => {
    VIEW — AUDIT TRAIL
 ───────────────────────────────────────────────────────── */
 const AuditView = () => {
-    const [filter, setFilter]   = useState("all");
-    const [logs, setLogs]       = useState([]);
+    const [filter, setFilter] = useState("all");
+    const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchAudit = useCallback(async () => {
@@ -661,37 +659,37 @@ const AuditView = () => {
 
     // Export CSV
     const exportCSV = () => {
-        const headers = ["ID","Date","Décision","Type alerte","Sévérité","Titre alerte","Justification","Validation sémantique"];
+        const headers = ["ID", "Date", "Décision", "Type alerte", "Sévérité", "Titre alerte", "Justification", "Validation sémantique"];
         const rows = logs.map(e => [
             e.id,
             e.created_at ? new Date(e.created_at).toLocaleString("fr-FR") : "",
             e.decision,
-            e.alert_type    || "",
+            e.alert_type || "",
             e.alert_severity || "",
-            `"${(e.alert_title    || "").replace(/"/g,'""')}"`,
-            `"${(e.justification  || "").replace(/"/g,'""')}"`,
+            `"${(e.alert_title || "").replace(/"/g, '""')}"`,
+            `"${(e.justification || "").replace(/"/g, '""')}"`,
             e.justification_valid || "",
         ].join(","));
-        const csv  = [headers.join(","), ...rows].join("\n");
+        const csv = [headers.join(","), ...rows].join("\n");
         const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href     = url;
-        a.download = `audit_saferx_${new Date().toISOString().slice(0,10)}.csv`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audit_saferx_${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     };
 
     // Adapter le format API → format UI
     const mapped = logs.map(entry => ({
-        id:                     entry.id,
-        timestamp:              entry.created_at,
-        action:                 decisionToAction[entry.decision] || entry.decision,
-        severity:               entry.alert_severity || "NONE",
-        detail:                 entry.alert_title    || "—",
-        drug:                   entry.alert_type     || "—",
-        justif:                 entry.justification,
-        justification_valid:    entry.justification_valid,
+        id: entry.id,
+        timestamp: entry.created_at,
+        action: decisionToAction[entry.decision] || entry.decision,
+        severity: entry.alert_severity || "NONE",
+        detail: entry.alert_title || "—",
+        drug: entry.alert_type || "—",
+        justif: entry.justification,
+        justification_valid: entry.justification_valid,
         justification_feedback: entry.justification_feedback,
     }));
 
@@ -699,27 +697,26 @@ const AuditView = () => {
         ? mapped
         : mapped.filter(l => l.action === filter);
 
-    const overrideCount = mapped.filter(l => l.action === "OVERRIDE").length;
+    // const overrideCount = mapped.filter(l => l.action === "OVERRIDE").length;
 
     return (
         <div className="flex flex-col gap-5">
             <div className="flex items-center gap-2 flex-wrap justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
                     {[
-                        { val: "all",              label: "Tout" },
-                        { val: "ALERT_ACCEPTED",   label: "✅ Acceptée" },
-                        { val: "OVERRIDE",         label: "⚠️ Override" },
-                        { val: "ALERT_IGNORED",    label: "❌ Ignorée" },
-                        { val: "PRESCRIPTION_OK",  label: "🛡️ OK" },
+                        { val: "all", label: "Tout" },
+                        { val: "ALERT_ACCEPTED", label: "✅ Acceptée" },
+                        { val: "OVERRIDE", label: "⚠️ Override" },
+                        { val: "ALERT_IGNORED", label: "❌ Ignorée" },
+                        { val: "PRESCRIPTION_OK", label: "🛡️ OK" },
                     ].map(({ val, label }) => (
                         <button
                             key={val}
                             onClick={() => setFilter(val)}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-                                filter === val
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ${filter === val
                                     ? "bg-blue-600 border-blue-600 text-white"
                                     : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
-                            }`}
+                                }`}
                         >
                             {label}
                         </button>
@@ -727,11 +724,11 @@ const AuditView = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={fetchAudit} title="Rafraîchir"
-                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:border-blue-300 bg-white transition-all">
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:border-blue-300 bg-white transition-all">
                         <RefreshCw size={12} /> Rafraîchir
                     </button>
                     <button onClick={exportCSV} title="Exporter CSV"
-                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white transition-all">
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white transition-all">
                         <Download size={12} /> Export CSV
                     </button>
                 </div>
@@ -752,53 +749,53 @@ const AuditView = () => {
                 ) : filtered.length === 0 ? (
                     <div className="py-12 text-center text-slate-400 text-sm">Aucune entrée d'audit.</div>
                 ) : (
-                <div className="divide-y divide-slate-50">
-                    {filtered.map(log => {
-                        const { date, time } = formatDateTime(log.timestamp);
-                        return (
-                        <div key={log.id} className="px-5 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                            <div className="shrink-0 w-36">
-                                <p className="text-xs font-mono text-slate-500">{date}</p>
-                                <p className="text-xs font-mono font-bold text-slate-700">{time}</p>
-                            </div>
-                            <div className="shrink-0 mt-0.5">{actionIcon[log.action] || actionIcon["PRESCRIPTION_OK"]}</div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                    <span className="text-sm font-semibold text-slate-800">{log.action}</span>
-                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${severityColor[log.severity] || severityColor["NONE"]}`}>
-                                        {log.severity === "NONE" ? "Aucune alerte" : log.severity}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-slate-500">{log.detail}</p>
-                                {log.justif && (
-                                    <div className="mt-1.5 space-y-1">
-                                        <p className="text-xs text-amber-600 italic">
-                                            Justification : {log.justif}
-                                        </p>
-                                        {/* Badge validation sémantique §3.3 */}
-                                        {log.justification_valid && (
-                                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border
-                                                ${log.justification_valid === "valid"
-                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                    : "bg-red-50 text-red-600 border-red-200"}`}>
-                                                {log.justification_valid === "valid" ? "✓ Justification valide" : "✗ Justification insuffisante"}
-                                                {log.justification_feedback && (
-                                                    <span className="font-normal opacity-80">— {log.justification_feedback}</span>
-                                                )}
+                    <div className="divide-y divide-slate-50">
+                        {filtered.map(log => {
+                            const { date, time } = formatDateTime(log.timestamp);
+                            return (
+                                <div key={log.id} className="px-5 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+                                    <div className="shrink-0 w-36">
+                                        <p className="text-xs font-mono text-slate-500">{date}</p>
+                                        <p className="text-xs font-mono font-bold text-slate-700">{time}</p>
+                                    </div>
+                                    <div className="shrink-0 mt-0.5">{actionIcon[log.action] || actionIcon["PRESCRIPTION_OK"]}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <span className="text-sm font-semibold text-slate-800">{log.action}</span>
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${severityColor[log.severity] || severityColor["NONE"]}`}>
+                                                {log.severity === "NONE" ? "Aucune alerte" : log.severity}
                                             </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500">{log.detail}</p>
+                                        {log.justif && (
+                                            <div className="mt-1.5 space-y-1">
+                                                <p className="text-xs text-amber-600 italic">
+                                                    Justification : {log.justif}
+                                                </p>
+                                                {/* Badge validation sémantique §3.3 */}
+                                                {log.justification_valid && (
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border
+                                                ${log.justification_valid === "valid"
+                                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                            : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                        {log.justification_valid === "valid" ? "✓ Justification valide" : "✗ Justification insuffisante"}
+                                                        {log.justification_feedback && (
+                                                            <span className="font-normal opacity-80">— {log.justification_feedback}</span>
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
-                            <div className="shrink-0 text-right hidden sm:block">
-                                <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">
-                                    {log.drug}
-                                </span>
-                            </div>
-                        </div>
-                        );
-                    })}
-                </div>
+                                    <div className="shrink-0 text-right hidden sm:block">
+                                        <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">
+                                            {log.drug}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
             </div>
         </div>
@@ -809,9 +806,9 @@ const AuditView = () => {
    ROOT DASHBOARD
 ───────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
-    const [activeNav,  setActiveNav]  = useState("overview");
-    const [stats,      setStats]      = useState(null);
-    const [topAlerts,  setTopAlerts]  = useState([]);
+    const [activeNav, setActiveNav] = useState("overview");
+    const [stats, setStats] = useState(null);
+    const [topAlerts, setTopAlerts] = useState([]);
     const [auditCount, setAuditCount] = useState(0);
     const currentUser = authService.getUser();
 
@@ -820,16 +817,16 @@ const AdminDashboard = () => {
         const fetchStats = async () => {
             try {
                 const res = await api.get("/account/stats");
-                const d   = res.data;
+                const d = res.data;
                 setStats({
-                    totalUsers:        d.total_users,
-                    activeDoctors:     d.active_doctors,
+                    totalUsers: d.total_users,
+                    activeDoctors: d.active_doctors,
                     activePharmacists: d.active_pharmacists,
                     prescriptionsToday: d.prescriptions_today,
-                    alertsToday:       d.total_audit_entries,
-                    overrideRate:      d.override_rate,
-                    complianceRate:    d.compliance_rate,
-                    avgResponseMs:     187,   // nécessiterait un middleware de mesure
+                    alertsToday: d.total_audit_entries,
+                    overrideRate: d.override_rate,
+                    complianceRate: d.compliance_rate,
+                    avgResponseMs: 187,   // nécessiterait un middleware de mesure
                 });
                 setTopAlerts(d.top_alerts || []);
                 setAuditCount(
@@ -848,14 +845,14 @@ const AdminDashboard = () => {
         overview: stats
             ? <OverviewView stats={stats} topAlerts={topAlerts} />
             : <div className="flex justify-center py-20"><Spinner /></div>,
-        users:    <UsersView />,
-        audit:    <AuditView />,
+        users: <UsersView />,
+        audit: <AuditView />,
     };
 
     const viewTitles = {
-        overview: { title: "Vue d'ensemble",  sub: "Tableau de bord SafeRx AI — Données du jour" },
-        users:    { title: "Gestion des comptes", sub: "Créer et gérer les médecins et pharmaciens" },
-        audit:    { title: "Audit Trail",     sub: "Journal immuable de toutes les transactions cliniques" },
+        overview: { title: "Vue d'ensemble", sub: "Tableau de bord SafeRx AI — Données du jour" },
+        users: { title: "Gestion des comptes", sub: "Créer et gérer les médecins et pharmaciens" },
+        audit: { title: "Audit Trail", sub: "Journal immuable de toutes les transactions cliniques" },
     };
 
     return (
@@ -902,15 +899,14 @@ const AdminDashboard = () => {
 
                     {/* Nav */}
                     <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-                        {NAV.map(({ id, icon: Icon, label }) => (
+                        {NAV.map(({ id, icon: Icon, label }) => ( // eslint-disable-line no-unused-vars
                             <button
                                 key={id}
                                 onClick={() => setActiveNav(id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
-                                    activeNav === id
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${activeNav === id
                                         ? "bg-white bg-opacity-15 text-white"
                                         : "text-slate-400 hover:text-white hover:bg-white hover:bg-opacity-5"
-                                }`}
+                                    }`}
                             >
                                 <Icon size={16} className={activeNav === id ? "text-blue-300" : ""} />
                                 {label}

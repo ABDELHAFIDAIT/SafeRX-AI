@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Stethoscope, Activity, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import authService from "../services/authService";
+import authService from "../services/AuthService";
 
 const Login = () => {
     const navigate = useNavigate();
@@ -28,7 +28,7 @@ const Login = () => {
             const role = data.role?.toLowerCase();
             if (role === "admin") {
                 navigate("/dashboard/admin");
-            } else if (role === "doctor" || role === "pharmacist") {
+            } else if (role === "doctor") {
                 navigate("/dashboard/doctor");
             } else {
                 navigate("/dashboard/doctor"); // fallback

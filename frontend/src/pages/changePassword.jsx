@@ -4,7 +4,7 @@ import {
     AlertCircle, CheckCircle2, KeyRound, RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import authService from "../services/authService";
+import authService from "../services/AuthService";
 
 /* ─── Règles de force du mot de passe ─────────────────────────── */
 const rules = [

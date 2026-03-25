@@ -24,14 +24,16 @@ const Login = () => {
                 return;
             }
 
-            // ── BUG #4 FIX : redirection selon le rôle ─────────────────
+            // ── Redirection selon le rôle ─────────────────
             const role = data.role?.toLowerCase();
             if (role === "admin") {
                 navigate("/dashboard/admin");
             } else if (role === "doctor") {
                 navigate("/dashboard/doctor");
+            } else if (role === "pharmacist") {
+                navigate("/dashboard/pharmacist");
             } else {
-                navigate("/dashboard/doctor"); // fallback
+                navigate("/dashboard/doctor"); // fallback pour rôles inconnus
             }
 
         } catch (err) {

@@ -3,6 +3,7 @@ import Login          from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import AdminDashboard from "./pages/AdminDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import PharmacistDashboard from "./pages/PharmacistDashboard";
 import authService    from "./services/AuthService";
 import "./App.css";
 
@@ -43,10 +44,17 @@ function App() {
                     </PrivateRoute>
                 } />
 
-                {/* ── Dashboard Médecin / Pharmacien ───────────────── */}
+                {/* ── Dashboard Médecin ───────────────── */}
                 <Route path="/dashboard/doctor" element={
-                    <PrivateRoute allowedRoles={["doctor", "pharmacist"]}>
+                    <PrivateRoute allowedRoles={["doctor"]}>
                         <DoctorDashboard />
+                    </PrivateRoute>
+                } />
+
+                {/* ── Dashboard Pharmacien ───────────────── */}
+                <Route path="/dashboard/pharmacist" element={
+                    <PrivateRoute allowedRoles={["pharmacist"]}>
+                        <PharmacistDashboard />
                     </PrivateRoute>
                 } />
 

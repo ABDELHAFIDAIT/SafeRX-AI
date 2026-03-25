@@ -7,24 +7,46 @@ from backend.app.core.config import settings
 
 
 def generate_password(length: int = 12) -> str:
-    # Génère un mot de passe sécurisé avec au moins 1 MAJ, 1 chiffre et 1 caractère spécial
+    """
+    Génère un mot de passe cryptographiquement sûr avec au minimum:
+    - 1 majuscule
+    - 1 chiffre
+    - 1 caractère spécial
+    
+    Args:
+        length: Longueur totale du mot de passe (min 12)
+    
+    Returns:
+        Mot de passe généré avec mélange aléatoire
+    """
     alphabet = string.ascii_letters + string.digits + "!@#$%&*"
     password = [
-        secrets.choice(string.ascii_uppercase),  # garantit une majuscule
-        secrets.choice(string.digits),  # garantit un chiffre
-        secrets.choice("!@#$%&*"),  # garantit un caractère spécial
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%&*"),
     ]
     password += [secrets.choice(alphabet) for _ in range(length - 3)]
-    secrets.SystemRandom().shuffle(
-        password
-    )  # mélange aléatoire cryptographiquement sûr
+    secrets.SystemRandom().shuffle(password)
     return "".join(password)
 
 
 def send_credentials_email(
     to_email: str, first_name: str, role: str, plain_password: str
 ) -> None:
-    # Traduit le rôle technique en label lisible pour l'affichage dans l'email
+    """
+    Envoie les identifiants de connexion par email (HTML stylisé).
+    Inclut un avertissement concernant le changement obligatoire du mot de passe.
+    
+    Args:
+        to_email: Adresse destinataire
+        first_name: Prénom de l'utilisateur (pour la personnalisation)
+        role: Rôle (doctor, pharmacist, admin) — affiché en français
+        plain_password: Mot de passe en clair à communiquer
+    
+    Raises:
+        smtplib.SMTPException si la connexion SMTP échoue
+    """
+    # Traduction des rôles techniques en labels français
     role_labels = {
         "doctor": "Médecin",
         "pharmacist": "Pharmacien",
@@ -34,7 +56,7 @@ def send_credentials_email(
 
     subject = "SafeRx AI — Vos identifiants de connexion"
 
-    # Template HTML de l'email avec card stylisée et avertissement changement de MDP
+    # Template HTML moderne avec styles inline pour compatibilité maximale
     html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:32px;">
@@ -99,11 +121,11 @@ def send_credentials_email(
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
 
-    # Connexion SMTP avec TLS et authentification optionnelle selon la config
+    # Connexion SMTP avec TLS optionnel et authentification conditionnelle
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
         server.ehlo()
         if settings.SMTP_TLS:
-            server.starttls()  # chiffrement de la connexion si configuré
+            server.starttls()
         if settings.SMTP_USER and settings.SMTP_PASSWORD:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())

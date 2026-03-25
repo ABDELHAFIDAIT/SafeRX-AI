@@ -31,6 +31,21 @@ def create_audit_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Enregistre la décision du praticien (ACCEPTED/IGNORED/OVERRIDE) sur une alerte.
+    
+    Si la décision est OVERRIDE, la justification est validée par LLM.
+    
+    Args:
+        payload: Décision (alert_id, decision, justification optionnelle)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (sera défini comme doctor_id)
+        
+    Returns:
+        AuditOut: Entrée d'audit créée avec résultat de validation LLM si OVERRIDE
+        
+    Raises:
+        HTTP 404: Alerte non trouvée
+    """
     # Vérifier que l'alerte existe
     alert = db.query(CdsAlert).filter(CdsAlert.id == payload.alert_id).first()
     if not alert:
@@ -88,6 +103,19 @@ def create_bulk_audit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Enregistre toutes les décisions d'une prescription en une seule requête.
+    
+    Bypasse les alertes inconnues sans bloquer le reste.
+    Chaque OVERRIDE subit une validation LLM indépendante.
+    
+    Args:
+        payload: Prescription ID et liste de décisions
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (sera défini comme doctor_id pour toutes)
+        
+    Returns:
+        list[AuditOut]: Entrées d'audit créées
+    """
     entries = []
     for decision in payload.decisions:
         alert = db.query(CdsAlert).filter(CdsAlert.id == decision.alert_id).first()
@@ -144,6 +172,18 @@ def get_audit_for_prescription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Retourne l'historique d'audit (tou tes les décisions) pour une prescription.
+    
+    Trié par date décroissante (plus récentes en premier).
+    
+    Args:
+        prescription_id: ID de la prescription
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        list[AuditOut]: Historique d'audit complet
+    """
     return (
         db.query(AuditCdsHook)
         .filter(AuditCdsHook.prescription_id == prescription_id)
@@ -167,6 +207,21 @@ def get_recent_audit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Retourne le flux d'audit système des décisions récentes (admin uniquement).
+    
+    Trié par date décroissante.
+    
+    Args:
+        limit: Nombre maximum de résultats (max 200, default 50)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (doit être ADMIN)
+        
+    Returns:
+        list[AuditOut]: Historique d'audit récent système
+        
+    Raises:
+        HTTP 403: Rôle insuffisant
+    """
     if current_user.role != Role.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

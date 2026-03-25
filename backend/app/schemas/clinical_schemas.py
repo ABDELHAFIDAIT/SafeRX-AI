@@ -8,32 +8,36 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class PatientBase(BaseModel):
+    """Base schema Patient — données cliniques et anthropométriques."""
     birthdate: date
     gender: str = Field(..., pattern="^(M|F|O)$")
-    # float au lieu de Decimal — SQLAlchemy Column(Float) attend un float, pas un Decimal
+    # Float au lieu de Decimal — SQLAlchemy Column(Numeric) accepte float en Pydantic
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
     creatinine_clearance: Optional[float] = None
     is_pregnant: Optional[bool] = False
     gestational_weeks: Optional[int] = None
     is_breastfeeding: Optional[bool] = False
-    # default_factory=list et non None — évite d'insérer NULL dans les colonnes JSON
+    # default_factory=list évite NULL dans les colonnes JSON PostgreSQL
     known_allergies: Optional[List[str]] = Field(default_factory=list)
     pathologies_cim10: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator("gestational_weeks")
     @classmethod
     def check_gestational_weeks(cls, v, info):
+        """Valide que les semaines de grossesse sont entre 1 et 42."""
         if v is not None and not (1 <= v <= 42):
             raise ValueError("gestational_weeks doit être entre 1 et 42")
         return v
 
 
 class PatientCreate(PatientBase):
+    """Payload pour la création d'un patient — inclut optionnellement un identifiant FHIR."""
     fhir_patient_id: Optional[uuid.UUID] = None
 
 
 class PatientUpdate(BaseModel):
+    """Payload pour la mise à jour partielle d'un patient."""
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
     creatinine_clearance: Optional[float] = None
@@ -45,6 +49,7 @@ class PatientUpdate(BaseModel):
 
 
 class PatientOut(PatientBase):
+    """Schéma de réponse complet pour un patient avec ID et timestamps."""
     id: int
     fhir_patient_id: Optional[uuid.UUID] = None
     created_at: datetime
@@ -56,6 +61,7 @@ class PatientOut(PatientBase):
 
 
 class PrescriptionLineBase(BaseModel):
+    """Base schéma pour une ligne de prescription — détail d'un médicament prescrit."""
     drug_id: int
     dci: str = Field(..., min_length=1, max_length=255)
     dose_mg: float = Field(..., gt=0, description="Dose normalisée en mg")
@@ -66,10 +72,12 @@ class PrescriptionLineBase(BaseModel):
 
 
 class PrescriptionLineCreate(PrescriptionLineBase):
+    """Payload pour créer une ligne de prescription."""
     pass
 
 
 class CdsAlertOut(BaseModel):
+    """Schéma de réponse pour une alerte CDS — résultat d'analyse."""
     id: int
     alert_type: str
     severity: str
@@ -83,6 +91,7 @@ class CdsAlertOut(BaseModel):
 
 
 class PrescriptionLineOut(PrescriptionLineBase):
+    """Schéma de réponse pour une ligne de prescription — inclut les alertes CDS associées."""
     id: int
     prescription_id: int
     alerts: List[CdsAlertOut] = []
@@ -94,6 +103,7 @@ class PrescriptionLineOut(PrescriptionLineBase):
 
 
 class PrescriptionCreate(BaseModel):
+    """Payload pour créer une prescription — inclut au moins une ligne de médicament."""
     patient_id: int
     lines: List[PrescriptionLineCreate] = Field(..., min_length=1)
     fhir_bundle_id: Optional[uuid.UUID] = None
@@ -101,6 +111,7 @@ class PrescriptionCreate(BaseModel):
 
 
 class PrescriptionOut(BaseModel):
+    """Schéma de réponse complet pour une prescription — inclut lignes et alertes."""
     id: int
     patient_id: int
     doctor_id: int
@@ -114,6 +125,7 @@ class PrescriptionOut(BaseModel):
 
 
 class CdsResponse(BaseModel):
+    """Réponse complète d'une analyse CDS — détail des alertes et décisions."""
     prescription_id: int
     status: str
     alert_count: int

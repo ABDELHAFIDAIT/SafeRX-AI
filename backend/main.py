@@ -10,28 +10,28 @@ from backend.app.db.init_db import init_db
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter
 
-# Alertes CDS générées par le moteur de règles
+# Alertes CDS générées par le moteur de règles — suivi des alertes de sécurité
 CDS_ALERTS_TOTAL = Counter(
     "saferx_cds_alerts_total",
     "Nombre d'alertes CDS générées",
     ["alert_type", "severity"],
 )
 
-# Alertes enrichies par le RAG (LLM a fourni une explication)
+# Alertes enrichies par le RAG/LLM — suivi de l'enrichissement IA
 RAG_ENRICHED_TOTAL = Counter(
     "saferx_rag_enriched_total",
     "Alertes enrichies par le LLM (RAG)",
     ["alert_type"],
 )
 
-# Décisions des médecins face aux alertes
+# Décisions des médecins sur les alertes — suivi de l'acceptation/rejet
 AUDIT_DECISIONS_TOTAL = Counter(
     "saferx_audit_decisions_total",
     "Décisions médecin : ACCEPTED / IGNORED / OVERRIDE",
     ["decision", "alert_type", "severity"],
 )
 
-# Prescriptions créées (safe = 0 alerte, alerts = au moins 1 alerte)
+# Prescriptions créées — suivi par statut (safe = sans alerte, alerts = avec alerte)
 PRESCRIPTIONS_TOTAL = Counter(
     "saferx_prescriptions_total",
     "Prescriptions créées, par statut",
@@ -40,21 +40,23 @@ PRESCRIPTIONS_TOTAL = Counter(
 
 
 def record_cds_alerts(alerts: list) -> None:
+    """Enregistre les alertes CDS et leur enrichissement RAG dans Prometheus."""
     for alert in alerts:
         CDS_ALERTS_TOTAL.labels(
             alert_type=alert.alert_type or "UNKNOWN",
             severity=alert.severity or "UNKNOWN",
         ).inc()
-
         if alert.rag_explanation:
             RAG_ENRICHED_TOTAL.labels(alert_type=alert.alert_type or "UNKNOWN").inc()
 
 
 def record_prescription(status: str) -> None:
+    """Enregistre une prescription créée (safe ou alerts)."""
     PRESCRIPTIONS_TOTAL.labels(status=status).inc()
 
 
 def record_audit_decision(decision: str, alert_type: str, severity: str) -> None:
+    """Enregistre une décision médicale (ACCEPTED, IGNORED, ou OVERRIDE)."""
     AUDIT_DECISIONS_TOTAL.labels(
         decision=decision,
         alert_type=alert_type or "UNKNOWN",

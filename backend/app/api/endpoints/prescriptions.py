@@ -37,6 +37,23 @@ def create_prescription_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Crée une prescription et déclenche immédiatement l'analyse CDS.
+    
+    Retourne l'analyse complète (alertes, status, détails prescription).
+    Accessible aux médecins et pharmaciens uniquement.
+    
+    Args:
+        payload: Données de prescription (patient_id, lignes de médicaments)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (doctor ou pharmacist)
+        
+    Returns:
+        CdsResponse: Analyse CDS avec alertes et détails prescription
+        
+    Raises:
+        HTTP 403: Rôle insuffisant
+        HTTP 422: Données invalides (patient inexistant, médicament introuvable)
+    """
     # Accessible aux médecins et pharmaciens — analyse CDS + alertes retournées immédiatement
     if current_user.role not in (Role.DOCTOR, Role.PHARMACIST):
         raise HTTPException(
@@ -79,6 +96,19 @@ def get_prescription_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Récupère les détails d'une prescription avec ses alertes CDS.
+    
+    Args:
+        prescription_id: ID de la prescription
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        CdsResponse: Détails complets avec alertes
+        
+    Raises:
+        HTTP 404: Prescription non trouvée
+    """
     prescription = get_prescription(db=db, prescription_id=prescription_id)
     if not prescription:
         raise HTTPException(
@@ -114,6 +144,18 @@ def list_patient_prescriptions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Retourne toutes les prescriptions d'un patient (paginées).
+    
+    Args:
+        patient_id: ID du patient
+        skip: Nombre de prescriptions à ignorer
+        limit: Nombre maximum à retourner
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        list[PrescriptionOut]: Prescriptions du patient
+    """
     return list_prescriptions_for_patient(
         db=db, patient_id=patient_id, skip=skip, limit=limit
     )
@@ -135,6 +177,17 @@ def get_my_prescriptions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Retourne les prescriptions créées par le médecin/praticien connecté (triées par date).
+    
+    Args:
+        skip: Nombre de prescriptions à ignorer
+        limit: Nombre maximum (max 100)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        list[PrescriptionOut]: Prescriptions de l'utilisateur (plus récentes en premier)
+    """
     from backend.app.models.prescription import Prescription, PrescriptionLine
     from sqlalchemy.orm import selectinload
 

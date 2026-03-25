@@ -2,30 +2,34 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Informations générales de l'application
+    """
+    Configuration centralisée de l'application SafeRx AI.
+    Charge tous les paramètres depuis le fichier .env.
+    """
+    
+    # Métadonnées de l'application
     PROJECT_NAME: str
     API_STR: str
     VERSION: str
 
-    # Connexion PostgreSQL
+    # Paramètres de connexion PostgreSQL
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     POSTGRES_HOST: str
     POSTGRES_PORT: int
+    DATABASE_URL: str
 
-    DATABASE_URL: str  # URL SQLAlchemy construite depuis les variables ci-dessus
-
-    # Authentification JWT
+    # Configuration JWT pour l'authentification
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    # Compte administrateur initial créé au premier démarrage
+    # Admin initial (crée automatiquement au premier démarrage)
     ADMIN_EMAIL: str
     ADMIN_PASSWORD: str
 
-    # Configuration SMTP pour l'envoi des identifiants par email
+    # Serveur SMTP pour l'envoi des identifiants
     SMTP_HOST: str
     SMTP_PORT: int
     SMTP_TLS: bool
@@ -33,7 +37,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     SMTP_FROM_EMAIL: str
 
-    # Configuration LLM
+    # Configuration LLM (Ollama ou Gemini pour l'enrichissement RAG)
     LLM_PROVIDER: str
     LLM_MODEL: str
     OLLAMA_BASE_URL: str
@@ -44,8 +48,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        extra="ignore",  # ignore les variables .env non déclarées ici
+        extra="ignore",
     )
 
 
+# Instance globale des paramètres
 settings = Settings()

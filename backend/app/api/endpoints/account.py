@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 def _generate_password(length: int = 12) -> str:
-    # Génère un mot de passe aléatoire alphanumérique + caractères spéciaux
+    """Génère un mot de passe aléatoire alphanumérique + caractères spéciaux."""
     alphabet = string.ascii_letters + string.digits + "!@#$%"
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
@@ -29,6 +29,20 @@ def create_account(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Crée un nouveau compte utilisateur avec un mot de passe temporaire généré.
+    
+    Args:
+        payload: Données d'utilisateur (email, first_name, last_name, role)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (doit être ADMIN)
+        
+    Returns:
+        UserOut: Compte créé sans le hash du mot de passe
+        
+    Raises:
+        HTTP 403: Réservé à l'administrateur
+        HTTP 409: Email déjà utilisé
+    """
     # Seuls les admins peuvent créer des comptes
     if current_user.role != Role.ADMIN:
         raise HTTPException(
@@ -70,6 +84,19 @@ def change_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Permet à un utilisateur authentifié de changer son mot de passe.
+    
+    Args:
+        payload: Dictionnaire contenant "new_password" (min 8 caractères)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        dict: Message de confirmation
+        
+    Raises:
+        HTTP 422: Mot de passe trop court
+    """
     new_password = payload.get("new_password", "")
     if len(new_password) < 8:
         # Validation minimale de longueur avant hashage
@@ -89,7 +116,18 @@ def change_password(
 def list_users(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    # Retourne tous les comptes triés par date de création décroissante
+    """Retourne tous les comptes triés par date de création (plus récents en premier).
+    
+    Args:
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (doit être ADMIN)
+        
+    Returns:
+        list[UserOut]: Tous les comptes utilisateurs
+        
+    Raises:
+        HTTP 403: Réservé à l'administrateur
+    """
     if current_user.role != Role.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs."
@@ -112,6 +150,21 @@ def toggle_user_active(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Active ou désactive un compte utilisateur (inverse le booléen is_active).
+    
+    Args:
+        user_id: ID de l'utilisateur à activer/désactiver
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié (doit être ADMIN)
+        
+    Returns:
+        UserOut: Compte mis à jour
+        
+    Raises:
+        HTTP 403: Réservé à l'administrateur
+        HTTP 404: Utilisateur introuvable
+        HTTP 400: Impossible de désactiver son propre compte
+    """
     if current_user.role != Role.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs."

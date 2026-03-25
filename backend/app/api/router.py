@@ -9,8 +9,10 @@ from backend.app.api.endpoints import (
     ai,
 )
 
+# Routeur principal — rassemble tous les sous-routeurs des endpoints
 router = APIRouter()
 
+# Enregistrement des endpoints avec leurs préfixes et tags
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(account.router, prefix="/account", tags=["account"])
 router.include_router(patients.router, prefix="/patients", tags=["patients"])

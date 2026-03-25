@@ -10,6 +10,7 @@ router = APIRouter()
 
 
 class DrugSearchResult(BaseModel):
+    """Schéma pour afficher un résultat de recherche de médicament."""
     # Résultat enrichi de recherche médicament
     id: int
     brand_name: str
@@ -29,6 +30,7 @@ class DrugSearchResult(BaseModel):
 
 
 class DciComponentOut(BaseModel):
+    """Schéma pour un composant actif (DCI) au sein d'un médicament multi-actif."""
     id: int
     dci: str
     position: int
@@ -37,6 +39,7 @@ class DciComponentOut(BaseModel):
 
 
 class DrugDetailOut(BaseModel):
+    """Schéma complet pour afficher les détails d'un médicament avec tous ses composants."""
     # Réponse complète pour la fiche médicament détaillée
     id: int
     brand_name: str
@@ -62,6 +65,19 @@ def search_drugs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Recherche des médicaments par nom de marque ou DCI (insensible à la casse).
+    
+    Retourne les résultats triés par pertinence (correspondance exacte en premier).
+    
+    Args:
+        q: Chaîne de recherche (min 2 caractères)
+        limit: Nombre maximum de résultats (max 20, défaut 8)
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        list[DrugSearchResult]: Médicaments correspondants
+    """
     pattern = f"%{q.strip()}%"  # pattern ILIKE pour la recherche insensible à la casse
 
     drugs = (
@@ -115,7 +131,19 @@ def get_drug_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Récupère les détails complets d'un médicament avec ses composants DCI"""
+    """Récupère les détails complets d'un médicament avec tous ses composants DCI.
+    
+    Args:
+        drug_id: ID du médicament
+        db: Session SQLAlchemy
+        current_user: Utilisateur authentifié
+        
+    Returns:
+        DrugDetailOut: Détails du médicament avec composants DCI triés
+        
+    Raises:
+        HTTP 404: Médicament non trouvé
+    """
     drug = db.query(Drug).filter(Drug.id == drug_id).first()
     
     if not drug:

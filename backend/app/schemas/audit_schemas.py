@@ -8,6 +8,7 @@ VALID_DECISIONS = {"ACCEPTED", "IGNORED", "OVERRIDE"}
 
 
 class AuditCreate(BaseModel):
+    """Payload pour enregistrer la décision du praticien sur une alerte."""
     # Payload envoyé par le frontend pour enregistrer la décision du praticien sur une alerte
     alert_id: int
     prescription_id: int
@@ -17,7 +18,7 @@ class AuditCreate(BaseModel):
     @field_validator("justification")
     @classmethod
     def justification_required_for_override(cls, v, info):
-        # Bloque un OVERRIDE sans justification — contrainte métier obligatoire
+        """Bloque un OVERRIDE sans justification — contrainte métier obligatoire."""
         decision = info.data.get("decision")
         if decision == "OVERRIDE" and not (v and v.strip()):
             raise ValueError("Une justification est obligatoire pour un OVERRIDE.")
@@ -25,7 +26,7 @@ class AuditCreate(BaseModel):
 
 
 class AuditOut(BaseModel):
-    # Schéma de réponse complet incluant le résultat de la validation sémantique LLM
+    """Schéma de réponse complet incluant le résultat de la validation sémantique LLM."""
     id: int
     alert_id: int | None
     prescription_id: int | None
@@ -45,6 +46,6 @@ class AuditOut(BaseModel):
 
 
 class AuditBulkCreate(BaseModel):
-    # Permet de logger toutes les décisions d'une prescription en une seule requête
+    """Payload pour logger toutes les décisions d'une prescription en une seule requête."""
     prescription_id: int
     decisions: list[AuditCreate]

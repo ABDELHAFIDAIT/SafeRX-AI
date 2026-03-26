@@ -1,33 +1,10 @@
-"""
-SafeRx AI — DAG 1 : scraping_etl_pipeline
-==========================================
-Automatise chaque dimanche à 02h00 la chaîne complète :
-
-  1. scrape_medicaments    → scraper_med_ma.py
-                             Scrape medicament.ma → data/raw/all_drugs_med_ma.csv
-
-  2. transform_data        → transform_med_ma.py
-                             Nettoie et normalise → data/processed/drugs_ma_clean.csv
-                                                  → data/processed/dci_components.csv
-
-  3. load_drugs            → load_med_ma.py
-                             Insère / met à jour les tables drugs_ma et dci_components
-
-  4. load_interactions     → load_interactions.py
-                             Charge drug_interactions depuis interactions_ansm.csv
-
-Les scripts ETL sont montés depuis ./etl et ./scraping dans /app/etl et /app/scraping.
-Les données sont partagées via le volume ./data monté dans /app/data.
-"""
-
 from __future__ import annotations
-
 import logging
 from datetime import datetime, timedelta
-
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +19,7 @@ DATA_RAW = "/app/data/raw"
 DATA_PROC = "/app/data/processed"
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Paramètres par défaut — s'appliquent à toutes les tâches du DAG
+#  Paramètres par défaut 
 # ─────────────────────────────────────────────────────────────────────────────
 
 default_args = {
@@ -60,11 +37,6 @@ default_args = {
 
 
 def verifier_fichier_scrape(**context) -> None:
-    """
-    Vérifie que le fichier CSV brut existe et contient des données.
-    Lève une exception si le fichier est vide → arrête le DAG proprement
-    sans marquer une erreur sur le scraper.
-    """
     import os
     import csv
 
@@ -160,6 +132,4 @@ with DAG(
         ),
     )
 
-    # ── Ordre d'exécution ─────────────────────────────────────────────────────
-    # scrape → verifier → transform → load_drugs → load_interactions
     scrape >> verifier >> transform >> load_drugs >> load_interactions

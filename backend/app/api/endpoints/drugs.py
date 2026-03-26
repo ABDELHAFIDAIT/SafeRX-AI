@@ -6,6 +6,7 @@ from backend.app.models.drug import Drug, DciComponent
 from backend.app.models.user import User
 from pydantic import BaseModel
 
+
 router = APIRouter()
 
 
@@ -65,19 +66,6 @@ def search_drugs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Recherche des médicaments par nom de marque ou DCI (insensible à la casse).
-    
-    Retourne les résultats triés par pertinence (correspondance exacte en premier).
-    
-    Args:
-        q: Chaîne de recherche (min 2 caractères)
-        limit: Nombre maximum de résultats (max 20, défaut 8)
-        db: Session SQLAlchemy
-        current_user: Utilisateur authentifié
-        
-    Returns:
-        list[DrugSearchResult]: Médicaments correspondants
-    """
     pattern = f"%{q.strip()}%"  # pattern ILIKE pour la recherche insensible à la casse
 
     drugs = (
@@ -131,19 +119,6 @@ def get_drug_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Récupère les détails complets d'un médicament avec tous ses composants DCI.
-    
-    Args:
-        drug_id: ID du médicament
-        db: Session SQLAlchemy
-        current_user: Utilisateur authentifié
-        
-    Returns:
-        DrugDetailOut: Détails du médicament avec composants DCI triés
-        
-    Raises:
-        HTTP 404: Médicament non trouvé
-    """
     drug = db.query(Drug).filter(Drug.id == drug_id).first()
     
     if not drug:

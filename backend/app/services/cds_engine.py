@@ -1,15 +1,10 @@
-# Moteur de règles CDS — analyse chaque ligne de prescription et génère des alertes cliniques
-# Règles : ALLERGY, REDUNDANT_DCI, POSOLOGY, CONTRA_INDICATION, PSYCHOACTIVE, INTERACTION, RENAL
 from __future__ import annotations
-
 import re
 import unicodedata
 from datetime import date
 from typing import List
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-
 from backend.app.models.cds_alert import CdsAlert
 from backend.app.models.drug import Drug, DciComponent
 from backend.app.models.drug_interaction import DrugInteraction

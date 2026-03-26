@@ -2,7 +2,6 @@ import re
 import sys
 import unicodedata
 from pathlib import Path
-
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
@@ -11,9 +10,8 @@ from pyspark.sql.types import (
     BooleanType,
 )
 
+
 # ── Chemins ──────────────────────────────────────────────────────────────────
-# En Docker : script dans /app/ → parent = /app  (data/ est présent ici)
-# En local  : script dans etl/  → parent = etl/, on remonte d'un cran
 _HERE = Path(__file__).resolve().parent
 ROOT = _HERE if (_HERE / "data").exists() else _HERE.parent
 INPUT_CSV = ROOT / "data" / "raw" / "all_drugs_med_ma.csv"

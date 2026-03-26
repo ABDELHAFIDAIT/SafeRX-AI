@@ -7,18 +7,6 @@ from backend.app.core.config import settings
 
 
 def generate_password(length: int = 12) -> str:
-    """
-    Génère un mot de passe cryptographiquement sûr avec au minimum:
-    - 1 majuscule
-    - 1 chiffre
-    - 1 caractère spécial
-    
-    Args:
-        length: Longueur totale du mot de passe (min 12)
-    
-    Returns:
-        Mot de passe généré avec mélange aléatoire
-    """
     alphabet = string.ascii_letters + string.digits + "!@#$%&*"
     password = [
         secrets.choice(string.ascii_uppercase),
@@ -33,19 +21,6 @@ def generate_password(length: int = 12) -> str:
 def send_credentials_email(
     to_email: str, first_name: str, role: str, plain_password: str
 ) -> None:
-    """
-    Envoie les identifiants de connexion par email (HTML stylisé).
-    Inclut un avertissement concernant le changement obligatoire du mot de passe.
-    
-    Args:
-        to_email: Adresse destinataire
-        first_name: Prénom de l'utilisateur (pour la personnalisation)
-        role: Rôle (doctor, pharmacist, admin) — affiché en français
-        plain_password: Mot de passe en clair à communiquer
-    
-    Raises:
-        smtplib.SMTPException si la connexion SMTP échoue
-    """
     # Traduction des rôles techniques en labels français
     role_labels = {
         "doctor": "Médecin",

@@ -1,16 +1,12 @@
-# Service RAG : enrichit les alertes CDS avec des explications LLM
-# Providers supportés : Ollama (priorité) → Gemini (fallback) → désactivé silencieusement
 from __future__ import annotations
-
 import logging
 from typing import Optional
 from backend.app.core.config import settings
 
+
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Configuration (depuis .env)
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 LLM_PROVIDER = settings.LLM_PROVIDER
 OLLAMA_MODEL = settings.LLM_MODEL
@@ -18,12 +14,10 @@ OLLAMA_BASE_URL = settings.OLLAMA_BASE_URL
 GEMINI_API_KEY = settings.GEMINI_API_KEY
 GEMINI_MODEL = settings.GEMINI_MODEL
 
-# RAG actif si Ollama configuré OU clé Gemini présente
+
 RAG_ENABLED = (LLM_PROVIDER == "ollama") or bool(GEMINI_API_KEY)
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Initialisation LLM — lazy + fallback automatique
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 _llm = None
 _active_provider = None  # "ollama" | "gemini" | None
@@ -35,7 +29,7 @@ def _init_ollama():
         from langchain_core.messages import HumanMessage
 
         llm = ChatOllama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0.1)
-        llm.invoke([HumanMessage(content="ping")])  # test de connectivité
+        llm.invoke([HumanMessage(content="ping")])
         logger.info(f"[RAG] Ollama actif : {OLLAMA_MODEL} @ {OLLAMA_BASE_URL}")
         return llm
     except Exception as e:
@@ -63,7 +57,6 @@ def _init_gemini():
 
 
 def _get_llm():
-    # Retourne le LLM actif (mis en cache). Ordre : Ollama → Gemini → None
     global _llm, _active_provider
 
     if _llm is not None:

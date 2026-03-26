@@ -7,24 +7,12 @@ from backend.app.core.config import settings
 from backend.app.api.deps import get_db
 from backend.app.services import user_service
 
+
 router = APIRouter()
 
 
 @router.post("/login")
-def login(
-    db: Session = Depends(get_db),
-    form_data: OAuth2PasswordRequestForm = Depends(),
-):
-    """
-    Endpoint de connexion — authentifie un utilisateur avec email/mot de passe.
-    
-    Retourne:
-        - access_token: JWT signé (Bearer)
-        - token_type: "bearer"
-        - is_first_login: Flag indiquant si le mot de passe doit être changé
-        - role: Rôle de l'utilisateur (admin, doctor, pharmacist)
-        - first_name et last_name: Nom et prénom
-    """
+def login( db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends() ):
     # Recherche l'utilisateur et vérifie le mot de passe
     user = user_service.get_user_by_email(db, email=form_data.username)
     if not user or not security.verify_password(form_data.password, user.password):

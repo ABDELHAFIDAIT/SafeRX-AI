@@ -4,28 +4,24 @@ from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
-# ── Schémas Patient ───────────────────────────────────────────────────────────
+
 
 
 class PatientBase(BaseModel):
-    """Base schema Patient — données cliniques et anthropométriques."""
     birthdate: date
-    gender: str = Field(..., pattern="^(M|F|O)$")
-    # Float au lieu de Decimal — SQLAlchemy Column(Numeric) accepte float en Pydantic
+    gender: str = Field(..., pattern="^(M|F)$")
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
     creatinine_clearance: Optional[float] = None
     is_pregnant: Optional[bool] = False
     gestational_weeks: Optional[int] = None
     is_breastfeeding: Optional[bool] = False
-    # default_factory=list évite NULL dans les colonnes JSON PostgreSQL
     known_allergies: Optional[List[str]] = Field(default_factory=list)
     pathologies_cim10: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator("gestational_weeks")
     @classmethod
     def check_gestational_weeks(cls, v, info):
-        """Valide que les semaines de grossesse sont entre 1 et 42."""
         if v is not None and not (1 <= v <= 42):
             raise ValueError("gestational_weeks doit être entre 1 et 42")
         return v
@@ -56,8 +52,6 @@ class PatientOut(PatientBase):
 
     model_config = {"from_attributes": True}
 
-
-# ── Schémas Ligne de Prescription ────────────────────────────────────────────
 
 
 class PrescriptionLineBase(BaseModel):
@@ -98,8 +92,6 @@ class PrescriptionLineOut(PrescriptionLineBase):
 
     model_config = {"from_attributes": True}
 
-
-# ── Schémas Prescription ──────────────────────────────────────────────────────
 
 
 class PrescriptionCreate(BaseModel):

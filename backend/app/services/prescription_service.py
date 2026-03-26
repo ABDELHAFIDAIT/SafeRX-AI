@@ -10,7 +10,7 @@ from backend.app.models.user import User
 from backend.app.schemas.clinical_schemas import PrescriptionCreate
 from backend.app.services.cds_engine import analyse_prescription, _normalize_for_ansm
 from backend.app.services.ai_service import enrich_alerts_with_rag, RAG_ENABLED
-from backend.app.services.lr_service import score_alerts
+# from backend.app.services.lr_service import score_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ def create_prescription(
 
     # ── Scoring Logistic Regression — ai_ignore_proba (best-effort) ──────
     try:
-        score_alerts(alerts)
+        # score_alerts(alerts)
         scored = sum(1 for a in alerts if a.ai_ignore_proba is not None)
         if scored:
             logger.info(

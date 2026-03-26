@@ -3,13 +3,11 @@ from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, field_validator
 
-# Ensemble des décisions valides — utilisé pour la validation côté schema
+
 VALID_DECISIONS = {"ACCEPTED", "IGNORED", "OVERRIDE"}
 
 
 class AuditCreate(BaseModel):
-    """Payload pour enregistrer la décision du praticien sur une alerte."""
-    # Payload envoyé par le frontend pour enregistrer la décision du praticien sur une alerte
     alert_id: int
     prescription_id: int
     decision: Literal["ACCEPTED", "IGNORED", "OVERRIDE"]
@@ -26,7 +24,6 @@ class AuditCreate(BaseModel):
 
 
 class AuditOut(BaseModel):
-    """Schéma de réponse complet incluant le résultat de la validation sémantique LLM."""
     id: int
     alert_id: int | None
     prescription_id: int | None
@@ -46,6 +43,5 @@ class AuditOut(BaseModel):
 
 
 class AuditBulkCreate(BaseModel):
-    """Payload pour logger toutes les décisions d'une prescription en une seule requête."""
     prescription_id: int
     decisions: list[AuditCreate]

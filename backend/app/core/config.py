@@ -2,10 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Configuration centralisée de l'application SafeRx AI.
-    Charge tous les paramètres depuis le fichier .env.
-    """
     
     # Métadonnées de l'application
     PROJECT_NAME: str

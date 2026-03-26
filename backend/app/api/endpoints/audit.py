@@ -1,16 +1,13 @@
-# /audit : POST unique → logger une décision | POST /bulk → décisions en lot
-# GET /prescription/{id} → historique | GET /recent → flux admin
 from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-
 from backend.app.api.deps import get_current_user, get_db
 from backend.app.models.audit_cds_hook import AuditCdsHook
 from backend.app.models.cds_alert import CdsAlert
 from backend.app.models.user import User, Role
 from backend.app.schemas.audit_schemas import AuditCreate, AuditBulkCreate, AuditOut
 from backend.app.services.ai_service import validate_override_justification
+
 
 router = APIRouter()
 
@@ -32,17 +29,17 @@ def create_audit_entry(
     current_user: User = Depends(get_current_user),
 ):
     """Enregistre la décision du praticien (ACCEPTED/IGNORED/OVERRIDE) sur une alerte.
-    
+
     Si la décision est OVERRIDE, la justification est validée par LLM.
-    
+
     Args:
         payload: Décision (alert_id, decision, justification optionnelle)
         db: Session SQLAlchemy
         current_user: Utilisateur authentifié (sera défini comme doctor_id)
-        
+
     Returns:
         AuditOut: Entrée d'audit créée avec résultat de validation LLM si OVERRIDE
-        
+
     Raises:
         HTTP 404: Alerte non trouvée
     """
@@ -66,7 +63,7 @@ def create_audit_entry(
         justification=payload.justification,
     )
 
-    # ── §3.3 Validation sémantique (OVERRIDE uniquement) ─────────────────
+    # ── Validation sémantique (OVERRIDE uniquement) ─────────────────
     if payload.decision == "OVERRIDE" and payload.justification:
         result = validate_override_justification(
             justification=payload.justification,
@@ -104,15 +101,15 @@ def create_bulk_audit(
     current_user: User = Depends(get_current_user),
 ):
     """Enregistre toutes les décisions d'une prescription en une seule requête.
-    
+
     Bypasse les alertes inconnues sans bloquer le reste.
     Chaque OVERRIDE subit une validation LLM indépendante.
-    
+
     Args:
         payload: Prescription ID et liste de décisions
         db: Session SQLAlchemy
         current_user: Utilisateur authentifié (sera défini comme doctor_id pour toutes)
-        
+
     Returns:
         list[AuditOut]: Entrées d'audit créées
     """
@@ -173,14 +170,14 @@ def get_audit_for_prescription(
     current_user: User = Depends(get_current_user),
 ):
     """Retourne l'historique d'audit (tou tes les décisions) pour une prescription.
-    
+
     Trié par date décroissante (plus récentes en premier).
-    
+
     Args:
         prescription_id: ID de la prescription
         db: Session SQLAlchemy
         current_user: Utilisateur authentifié
-        
+
     Returns:
         list[AuditOut]: Historique d'audit complet
     """
@@ -208,17 +205,17 @@ def get_recent_audit(
     current_user: User = Depends(get_current_user),
 ):
     """Retourne le flux d'audit système des décisions récentes (admin uniquement).
-    
+
     Trié par date décroissante.
-    
+
     Args:
         limit: Nombre maximum de résultats (max 200, default 50)
         db: Session SQLAlchemy
         current_user: Utilisateur authentifié (doit être ADMIN)
-        
+
     Returns:
         list[AuditOut]: Historique d'audit récent système
-        
+
     Raises:
         HTTP 403: Rôle insuffisant
     """

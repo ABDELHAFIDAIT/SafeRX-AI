@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
 from datetime import date
-
 from backend.tests.tests_conftest import make_patient, make_drug, make_line
 from backend.app.services.cds_engine import analyse_prescription
 

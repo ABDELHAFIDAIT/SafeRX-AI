@@ -5,14 +5,6 @@ from backend.app.models.user import User, Role
 
 
 def init_db(db: Session) -> None:
-    """
-    Initialise les données de base de la base de données.
-    Crée le compte administrateur par défaut si aucun admin n'existe.
-    Appelée au démarrage de l'application via le lifespan FastAPI.
-    
-    Args:
-        db: Session SQLAlchemy pour la requête
-    """
     # Cherche un compte admin existant
     user = (
         db.query(User)

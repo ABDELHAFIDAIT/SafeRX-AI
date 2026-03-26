@@ -1,7 +1,6 @@
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
-
 from backend.tests.tests_conftest import make_cds_alert, make_user, make_db_session
 from backend.app.models.user import Role
 

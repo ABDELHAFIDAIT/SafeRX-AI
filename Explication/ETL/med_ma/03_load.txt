@@ -1,0 +1,42 @@
+Fichiers CSV (clean)
+        ↓
+Lecture avec Pandas
+        ↓
+Nettoyage final (NaN, bool, IDs)
+        ↓
+Insertion table 1 : drugs_ma
+        ↓
+Récupération des IDs insérés
+        ↓
+Insertion table 2 : dci_components (avec FK)
+        ↓
+Commit / rollback
+
+
+
+Étapes :
+- Vérifie existence des fichiers
+- Connexion à PostgreSQL
+- Charge drugs_ma
+- Charge dci_components
+- Gestion erreurs (rollback)
+- Fermeture connexion
+
+
+           ┌──────────────┐
+           │ medicament.ma │
+           └──────┬───────┘
+                  ↓
+           [SCRAPER]
+                  ↓
+         raw CSV (dirty)
+                  ↓
+           [TRANSFORM]
+                  ↓
+     clean CSV / Parquet
+                  ↓
+             [LOAD]
+                  ↓
+          PostgreSQL DB
+         ├─ drugs_ma
+         └─ dci_components

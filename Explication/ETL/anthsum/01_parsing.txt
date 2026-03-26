@@ -1,0 +1,9 @@
+- Étape 1 (Extraction des mots avec leurs coordonnées et polices) 
+
+- Étape 2 (Reconstruction des lignes et séparation verticale en deux colonnes) 
+
+- Étape 3 (Identification des substances, niveaux et textes via les règles typographiques) 
+
+- Étape 4 (Assemblage des données et sauvegarde de l'interaction en mémoire) 
+
+- Étape 5 (Génération du fichier CSV structuré)

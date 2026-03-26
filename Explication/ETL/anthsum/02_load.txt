@@ -1,0 +1,11 @@
+- Étape 1 (Préparation de la connexion et du schéma de la base de données) 
+
+- Étape 2 (Lecture du fichier CSV et application des corrections textuelles manuelles) 
+
+- Étape 3 (Déduplication en conservant l'interaction la plus sévère ou la plus détaillée) 
+
+- Étape 4 (Symétrisation par création automatique des paires inverses B+A) 
+
+- Étape 5 (Insertion ou mise à jour en masse des données dans PostgreSQL) 
+
+- Étape 6 (Vérification et affichage des statistiques finales en base)

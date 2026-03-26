@@ -1,0 +1,25 @@
+CSV brut (scraping)
+        ↓
+Lecture Spark
+        ↓
+Nettoyage + normalisation (colonne par colonne)
+        ↓
+Création table principale : drugs_ma
+        ↓
+Création table relationnelle : dci_components
+        ↓
+Rapport qualité
+        ↓
+Export Parquet + CSV
+
+
+
+Étapes :
+- Vérifie que le CSV existe
+- Initialise Spark
+- Lance :
+    - transform_drugs_ma()
+    - build_dci_components()
+- Génère un rapport qualité
+- Écrit les outputs
+- Stop Spark

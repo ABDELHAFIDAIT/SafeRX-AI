@@ -1,0 +1,29 @@
+Input (lettres A-Z)
+        ↓
+Pour chaque lettre
+        ↓
+1. Trouver le nombre de pages
+        ↓
+2. Parcourir toutes les pages → récupérer les URLs des médicaments
+        ↓
+3. Scraper chaque fiche médicament (en parallèle)
+        ↓
+4. Stocker les données
+        ↓
+Concaténer toutes les lettres
+        ↓
+Exporter en CSV
+
+
+
+Étapes :
+- Démarre Playwright
+- Lance un navigateur Chromium (headless)
+- Crée un context (comme une session navigateur)
+- Boucle sur chaque lettre (A → Z)
+- Appelle scrape_letter() pour chaque lettre
+- Agrège toutes les données
+- Sauvegarde en CSV
+
+
+
